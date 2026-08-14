@@ -3,47 +3,56 @@ import json
 import base64
 import os
 
-def ask_with_image(question, base64_image, model="qwen3-vl-4b-instruct"):
-    try:
-        data_uri = f"data:image/jpeg;base64,{base64_image}"
-        
-        response = requests.post(
-            "http://localhost:1234/v1/chat/completions",
-            json={
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a concise, helpful study assistant. Keep answers brief as they will be spoken aloud."
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": question},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": data_uri
+def ask_with_image(question, base64_image, model="local-model", retries=1):
+    data_uri = f"data:image/jpeg;base64,{base64_image}"
+    
+    for attempt in range(retries + 1):
+        try:
+            response = requests.post(
+                "http://localhost:1234/v1/chat/completions",
+                json={
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a concise, helpful assistant. Your responses will be spoken aloud, so keep them brief and natural. "
+                                "You have been given a real screenshot of the user's screen taken right now. "
+                                "Always describe what you can see in the image. "
+                                "You have no memory of previous screenshots or conversations — each request is independent."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": question},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": data_uri
+                                    }
                                 }
-                            }
-                        ]
-                    }
-                ],
-                "temperature": 0.7,
-                "max_tokens": 1024
-            },
-            timeout=90
-        )
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
-    except requests.exceptions.ConnectionError:
-        return "LM Studio isn't running or the server isn't started. Check it."
-    except requests.exceptions.Timeout:
-        return "LM Studio took too long to respond."
-    except requests.exceptions.HTTPError as e:
-        return f"HTTP Error talking to LM Studio vision endpoint: {e}\nResponse body: {e.response.text}"
-    except Exception as e:
-        return f"Error talking to LM Studio vision endpoint: {e}"
+                            ]
+                        }
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 1024
+                },
+                timeout=90
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+        except requests.exceptions.HTTPError as e:
+            if "Model reloaded" in e.response.text and attempt < retries:
+                print("LM Studio reloaded the model. Retrying...")
+                continue
+            return f"HTTP Error talking to LM Studio vision endpoint: {e}\nResponse body: {e.response.text}"
+        except requests.exceptions.ConnectionError:
+            return "LM Studio isn't running or the server isn't started. Check it."
+        except requests.exceptions.Timeout:
+            return "LM Studio took too long to respond."
+        except Exception as e:
+            return f"Error talking to LM Studio vision endpoint: {e}"
 
 if __name__ == "__main__":
     print("Testing ask_with_image...")
