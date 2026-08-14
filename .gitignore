@@ -1,0 +1,14 @@
+# Audio files
+*.wav
+
+# Pretrained models
+pretrained_models/
+*.onnx
+*.onnx.json
+
+# Python caches and virtual environments
+__pycache__/
+*.pyc
+venv/
+.env
+.venv/
