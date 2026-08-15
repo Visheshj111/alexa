@@ -5,6 +5,7 @@ import sounddevice as sd
 import soundfile as sf
 import re
 import sys
+import numpy as np
 
 def _format_timestamp(m):
     """Convert MM:SS or H:MM:SS to speakable text."""
@@ -56,6 +57,7 @@ def clean_for_speech(text):
     return re.sub(r'\s+', ' ', text).strip()
 
 PIPER_MODEL = r"c:\Vishesh\Docs\Repos\alexa\en_US-lessac-high.onnx"
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".phrase_cache")
 
 def _piper_synthesize(text, wav_file):
     """Run Piper TTS on a text chunk and save to wav_file."""
@@ -83,11 +85,39 @@ def _play_wav(wav_file):
             sd.wait()
         except Exception as e:
             print(f"Audio playback error: {e}")
-        finally:
-            try:
-                os.remove(wav_file)
-            except OSError:
-                pass
+
+# ── Pre-cached phrase playback ──────────────────────────────────────────────
+# Short phrases that we know at startup are pre-rendered once and cached as
+# WAV files. Playing a cached WAV is ~5ms vs ~1500ms for a fresh Piper subprocess.
+
+_phrase_audio_cache = {}  # phrase_text -> (numpy_array, sample_rate)
+
+def _phrase_cache_path(phrase):
+    """Deterministic filename for a cached phrase."""
+    safe = re.sub(r'[^\w]', '_', phrase).strip('_')[:60]
+    return os.path.join(CACHE_DIR, f"{safe}.wav")
+
+def precache_phrases(phrases):
+    """Pre-render a list of short phrases to WAV at startup. Only synthesizes
+    phrases that aren't already cached on disk."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    for phrase in phrases:
+        cache_file = _phrase_cache_path(phrase)
+        if not os.path.exists(cache_file):
+            _piper_synthesize(phrase, cache_file)
+        # Load into memory for instant playback
+        if os.path.exists(cache_file) and os.path.getsize(cache_file) > 0:
+            data, fs = sf.read(cache_file)
+            _phrase_audio_cache[phrase] = (data, fs)
+
+def speak_cached(phrase):
+    """Play a pre-cached phrase instantly. Falls back to regular speak() if not cached."""
+    if phrase in _phrase_audio_cache:
+        data, fs = _phrase_audio_cache[phrase]
+        sd.play(data, fs)
+        sd.wait()
+    else:
+        speak(phrase)
 
 def speak(text):
     text = clean_for_speech(text)
@@ -103,3 +133,8 @@ def speak(text):
 
     _piper_synthesize(text, wav_file)
     _play_wav(wav_file)
+    # Clean up
+    try:
+        os.remove(wav_file)
+    except OSError:
+        pass
