@@ -18,6 +18,9 @@ VOCAB_PROMPT = (
     "brightness lock screen sleep "
     "click press tap select "
     "remind me reminder "
+    "remember forget what do you know about me "
+    "activate code disable code "
+    "search find file folder downloads documents desktop "
     "ChatGPT Gemini "
     "screen looking at read this see this "
 )

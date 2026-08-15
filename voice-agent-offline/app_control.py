@@ -75,5 +75,24 @@ def open_app(name):
                 return f"Couldn't open {key}: {e}"
     return f"I don't have a path saved for that. Add it to APP_PATHS in app_control.py."
 
+def close_app(name):
+    import os
+    name = name.lower().strip()
+    for key, path in APP_PATHS.items():
+        if key in name:
+            try:
+                exe_name = os.path.basename(path)
+                # Some paths might have arguments or uri schemes like "spotify:"
+                if not exe_name.endswith(".exe"):
+                    # Special case for MS settings or URI protocols
+                    return f"I can't reliably close {key} because it's a Windows subsystem or URI."
+                
+                # Use taskkill to terminate the process
+                subprocess.run(f'taskkill /IM "{exe_name}" /F', shell=True, capture_output=True)
+                return f"Closed {key}."
+            except Exception as e:
+                return f"Couldn't close {key}: {e}"
+    return f"I don't know how to close '{name}'. Try adding it to APP_PATHS."
+
 if __name__ == "__main__":
     print(open_app("calculator"))

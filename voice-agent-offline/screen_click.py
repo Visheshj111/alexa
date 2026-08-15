@@ -8,18 +8,18 @@ def get_actual_screen_size():
         monitor = sct.monitors[1]  # primary monitor
         return monitor["width"], monitor["height"]
 
-def scale_coordinates(x, y, resized_max_edge, actual_width, actual_height):
-    # This assumes exactly ONE resize step in the pipeline: screenshot.py resizes
-    # the image so its longest edge equals resized_max_edge before sending to
-    # LM Studio, and LM Studio's own "Never exceed" resize setting is OFF.
-    # If that LM Studio setting ever gets turned on, this math breaks silently
-    # and clicks will land in the wrong place. Check that setting first if
-    # clicks stop lining up.
-    longest_actual = max(actual_width, actual_height)
-    scale = longest_actual / resized_max_edge
-    return int(x * scale), int(y * scale)
+def scale_coordinates(x, y, actual_width, actual_height):
+    # Qwen-VL outputs coordinates normalized from 0 to 1000.
+    # 0,0 is top-left, 1000,1000 is bottom-right.
+    real_x = (x / 1000.0) * actual_width
+    real_y = (y / 1000.0) * actual_height
+    return int(real_x), int(real_y)
 
 def execute_click(x, y):
+    # Move the mouse to the coordinates first, taking a fraction of a second.
+    # This allows UI elements to register the 'hover' state before the click,
+    # which is required by many modern applications.
+    pyautogui.moveTo(x, y, duration=0.2)
     pyautogui.click(x, y)
 
 if __name__ == "__main__":
