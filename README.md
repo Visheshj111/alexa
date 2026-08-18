@@ -1,7 +1,5 @@
 # Alexa — Local Voice & Computer Agent
 
-#Alexa -- Local Voice & Computer Agent 
-
 A local-first voice assistant for Windows that combines speech recognition, local LLM reasoning, persistent memory, computer vision, and deterministic PC automation.
 
 > Built as a personal "Alexa for my PC" rather than a cloud-only chatbot: the assistant can understand spoken commands, answer questions with a local model, control applications and media, inspect the screen, search files, maintain memory, and execute computer actions with confirmation.
