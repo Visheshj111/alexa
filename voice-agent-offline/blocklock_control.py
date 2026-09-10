@@ -43,13 +43,16 @@ def handle_voice_command(text):
         result = _run("unlock")
         return result, result
 
-    if any(phrase in command for phrase in ("lock blocklock", "enable blocklock", "turn on blocklock", "start blocking")):
+    if any(phrase in command for phrase in ("lock blocklock", "blocklock lock", "enable blocklock", "turn on blocklock", "start blocking")):
         result = _run("lock")
         return result, result
 
-    site = re.search(r"(?:block|add)\s+(?:the\s+)?(?:site|website|domain)\s+([a-z0-9.-]+)", command)
+    site = re.search(r"(?:block|add)\s+(?:the\s+)?(?:site|website|domain)\s+(.+)", command)
     if site:
-        value = site.group(1).strip(".")
+        value = re.sub(r"\b(please|for me)\b", "", site.group(1)).strip().replace(" dot ", ".").strip(".")
+        value = value.replace(" ", "")
+        if not re.fullmatch(r"[a-z0-9.-]+", value):
+            return "I need a valid site name, such as reddit dot com.", "Invalid site name."
         result = _run("add-site", value)
         return result, result
 
