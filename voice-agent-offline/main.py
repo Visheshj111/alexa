@@ -32,6 +32,9 @@ def get_intent(text):
 
     if any(kw in text for kw in ["stop listening", "don't listen", "do not listen", "avoid listening"]):
         return "stop_listening"
+    if "blocklock" in text or any(kw in text for kw in ["block application", "block app", "block site", "block website"]):
+        return "blocklock"
+
 
     if any(kw in text for kw in ["shut down", "go to sleep forever", "turn off", "exit", "quit", "power off"]):
         return "shutdown"
@@ -355,6 +358,12 @@ def main_loop():
                     break_conversation = True
                     break
                 
+                elif intent == "blocklock":
+                    from blocklock_control import handle_voice_command
+                    spoken_result, terminal_result = handle_voice_command(cleaned_for_intent)
+                    print(f"BlockLock: {terminal_result}")
+                    speak(spoken_result)
+
                 if intent == "reminder":
                     from reminders import add_reminder
                     add_reminder(cmd_text)
