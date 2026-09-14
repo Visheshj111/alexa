@@ -27,14 +27,10 @@ def media_mute():
 def media_set_volume(level):
     try:
         level = max(0, min(100, int(level)))
-        from ctypes import cast, POINTER
-        from comtypes import CLSCTX_ALL
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+        from pycaw.pycaw import AudioUtilities
         
         devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(
-            IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
+        volume = devices.EndpointVolume
         
         # Scalar volume takes a float from 0.0 to 1.0
         volume.SetMasterVolumeLevelScalar(level / 100.0, None)

@@ -82,6 +82,13 @@ def close_app(name):
         if key in name:
             try:
                 exe_name = os.path.basename(path)
+                
+                # Special cases for Windows UWP apps
+                if key == "calculator":
+                    exe_name = "CalculatorApp.exe"
+                elif key == "settings":
+                    exe_name = "SystemSettings.exe"
+                    
                 # Some paths might have arguments or uri schemes like "spotify:"
                 if not exe_name.endswith(".exe"):
                     # Special case for MS settings or URI protocols

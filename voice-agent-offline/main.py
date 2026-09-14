@@ -1,8 +1,8 @@
 from wake_word import listen_for_wake_word
 from speaker_verify import verify_speaker
 from transcribe import transcribe_audio
-from ask_local import ask, ask_with_context, consolidate_memory
-from speak import speak, speak_cached, precache_phrases
+from ask_local import ask, ask_stream, ask_with_context, consolidate_memory
+from speak import speak, speak_cached, speak_stream, precache_phrases
 from memory import save_turn, add_explicit_memory, forget_memory, start_new_session
 from screenshot import capture_screen_base64
 from ask_vision import ask_with_image
@@ -89,9 +89,9 @@ def split_commands(text):
         commands.append(current_command.strip())
     return [c for c in commands if c]
 
-def record_clip(filename="clip.wav", silence_limit=1.5, max_seconds=15, seconds=None, wait_timeout=None):
+def record_clip(filename=None, silence_limit=0.4, max_seconds=15, seconds=None, wait_timeout=None):
     samplerate = 16000
-    chunk_duration = 0.1
+    chunk_duration = 0.05
     chunk_samples = int(samplerate * chunk_duration)
     
     print("\n🎙️ Listening... (Speak now!)")
@@ -101,7 +101,7 @@ def record_clip(filename="clip.wav", silence_limit=1.5, max_seconds=15, seconds=
     has_spoken = False
     
     with sd.InputStream(samplerate=samplerate, channels=1, dtype='float32', blocksize=chunk_samples) as stream:
-        # Dynamically calculate background noise threshold for 0.5s
+        # Dynamically calculate background noise threshold for 0.25s
         bg_noise = []
         for _ in range(5):
             chunk, _ = stream.read(chunk_samples)
@@ -133,7 +133,7 @@ def record_clip(filename="clip.wav", silence_limit=1.5, max_seconds=15, seconds=
                 if (time.time() - start_time) > wait_timeout:
                     return None
                 
-            # Stop if user finishes speaking
+            # Stop if user finishes speaking (400ms end-of-speech window)
             if has_spoken and silent_chunks > (silence_limit / chunk_duration):
                 break
                 
@@ -142,8 +142,9 @@ def record_clip(filename="clip.wav", silence_limit=1.5, max_seconds=15, seconds=
                 break
                 
     audio_data = np.concatenate(recorded_frames, axis=0)
-    sf.write(filename, audio_data, samplerate, subtype='PCM_16')
-    return filename
+    if filename:
+        sf.write(filename, audio_data, samplerate, subtype='PCM_16')
+    return audio_data
 
 def handle_click_intent(question, record_clip_fn, transcribe_fn, speak_fn):
     from ask_vision import ask_with_image
@@ -517,9 +518,8 @@ def main_loop():
 
                 else:
                     speak_cached(random.choice(THINKING_PHRASES))
-                    answer = ask(cmd_text)
+                    answer = speak_stream(ask_stream(cmd_text))
                     print(f"Model: {answer}")
-                    speak(answer)
                     needs_consolidation = save_turn(cmd_text, answer)
 
                 if locals().get("needs_consolidation", False):

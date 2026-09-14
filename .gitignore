@@ -12,3 +12,14 @@ __pycache__/
 venv/
 .env
 .venv/
+.phrase_cache/
+
+# Local runtime state and databases
+*.json
+*.json.bak
+.verification_state
+.continuous_state
+
+# Scratch and one-off patch scripts
+patch*.py
+fix_newlines.py

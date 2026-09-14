@@ -1,4 +1,6 @@
 import requests
+import json
+import re
 from memory import build_memory_context
 
 SYSTEM_PROMPT = (
@@ -10,15 +12,15 @@ SYSTEM_PROMPT = (
     "- No markdown — no asterisks, no bullet points, no headers, no code blocks in conversational replies.\n"
     "- Keep answers to 2-3 sentences unless the user explicitly asks for more detail.\n"
     "- If something has multiple parts, say them as a natural list in a sentence: "
-      "\"There are three things: first ..., second ..., and third ...\"\n"
+    "\"There are three things: first ..., second ..., and third ...\"\n"
     "- Match the user's energy — if they ask casually, reply casually.\n"
     "- The user's input comes from speech-to-text, so intelligently infer phonetic mishears "
-      "(e.g. 'chargipiti' means 'ChatGPT', 'jemina' means 'Gemini', 'react jay ess' means 'React.js').\n"
+    "(e.g. 'chargipiti' means 'ChatGPT', 'jemina' means 'Gemini', 'react jay ess' means 'React.js').\n"
     "- If you don't know something, say so directly and briefly.\n"
     "- You have a memory of past conversations. Use it to personalize your responses. "
-      "If the user asks about themselves, your opinions of them, or references past interactions, "
-      "use your memory to give a real, personal answer — never say 'I don't have memory' or "
-      "'I'm just an AI'. You DO remember. Act like it."
+    "If the user asks about themselves, your opinions of them, or references past interactions, "
+    "use your memory to give a real, personal answer — never say 'I don't have memory' or "
+    "'I'm just an AI'. You DO remember. Act like it."
 )
 
 def _build_system_with_memory():
@@ -29,17 +31,23 @@ def _build_system_with_memory():
     return SYSTEM_PROMPT
 
 def ask(question, model="local-model"):
+    from memory import get_recent_turns
     system = _build_system_with_memory()
+    
+    messages = [{"role": "system", "content": system}]
+    for turn in get_recent_turns(n=5):
+        messages.append({"role": "user", "content": turn['user']})
+        messages.append({"role": "assistant", "content": turn['assistant']})
+    messages.append({"role": "user", "content": question})
+
     try:
         response = requests.post(
             "http://localhost:1234/v1/chat/completions",
             json={
                 "model": model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": question}
-                ],
+                "messages": messages,
                 "temperature": 0.75,
+                "frequency_penalty": 1.2,
                 "max_tokens": 300,  # Hard cap — spoken answers should be short
             },
             timeout=30
@@ -52,6 +60,62 @@ def ask(question, model="local-model"):
         return "LM Studio took too long to respond."
     except Exception as e:
         return f"Error talking to LM Studio: {e}"
+
+def ask_stream(question, model="local-model"):
+    """Stream response from LM Studio and yield speakable sentence chunks as they arrive."""
+    from memory import get_recent_turns
+    system = _build_system_with_memory()
+    
+    messages = [{"role": "system", "content": system}]
+    for turn in get_recent_turns(n=5):
+        messages.append({"role": "user", "content": turn['user']})
+        messages.append({"role": "assistant", "content": turn['assistant']})
+    messages.append({"role": "user", "content": question})
+
+    try:
+        response = requests.post(
+            "http://localhost:1234/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "temperature": 0.75,
+                "frequency_penalty": 1.2,
+                "max_tokens": 300,
+                "stream": True,
+            },
+            stream=True,
+            timeout=30
+        )
+        response.raise_for_status()
+
+        buffer = ""
+        for line in response.iter_lines():
+            if not line:
+                continue
+            line = line.decode('utf-8')
+            if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                try:
+                    data = json.loads(line[6:])
+                    delta = data["choices"][0].get("delta", {}).get("content", "")
+                    if delta:
+                        buffer += delta
+                        parts = re.split(r'([.!?\n]+(?:\s+|$))', buffer)
+                        if len(parts) > 1:
+                            sentence = (parts[0] + parts[1]).strip()
+                            if sentence:
+                                yield sentence
+                            buffer = ''.join(parts[2:])
+                except json.JSONDecodeError:
+                    pass
+        if buffer.strip():
+            yield buffer.strip()
+
+    except requests.exceptions.ConnectionError:
+        yield "LM Studio isn't running or the server isn't started."
+    except requests.exceptions.Timeout:
+        yield "LM Studio took too long to respond."
+    except Exception as e:
+        yield f"Error talking to LM Studio: {e}"
 
 def ask_with_context(question, context_text, model="local-model"):
     """Ask a question about a specific piece of text (e.g. file contents)."""
@@ -75,10 +139,11 @@ def ask_with_context(question, context_text, model="local-model"):
                     {"role": "system", "content": system},
                     {"role": "user", "content": question}
                 ],
-                "temperature": 0.3,  # Lower temp = more factual, less creative
+                "temperature": 0.3,
+                "frequency_penalty": 1.2,
                 "max_tokens": 400,
             },
-            timeout=45  # File queries might be slightly slower
+            timeout=45
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
@@ -129,4 +194,3 @@ def consolidate_memory(model="local-model"):
     except Exception as e:
         print(f"[MEMORY] Consolidation failed: {e}")
         return False
-
