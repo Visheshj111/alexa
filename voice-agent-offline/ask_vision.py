@@ -2,9 +2,21 @@ import requests
 import json
 import base64
 import os
+from persona import build_system_prompt
 
-def ask_with_image(question, base64_image, model="local-model", retries=1):
+
+def ask_with_image(question, base64_image, model="local-model", mode="vision", retries=1):
+    """Send a screenshot to the vision model with the Jarvis persona.
+    
+    Args:
+        question: The user's question/request about the screen
+        base64_image: Base64-encoded JPEG screenshot
+        model: LM Studio model identifier
+        mode: "vision" for general screen analysis, "click" for coordinate extraction
+        retries: Number of retries on model reload
+    """
     data_uri = f"data:image/jpeg;base64,{base64_image}"
+    system = build_system_prompt(mode)
     
     for attempt in range(retries + 1):
         try:
@@ -15,12 +27,7 @@ def ask_with_image(question, base64_image, model="local-model", retries=1):
                     "messages": [
                         {
                             "role": "system",
-                            "content": (
-                                "You are a concise, helpful assistant. Your responses will be spoken aloud, so keep them brief and natural. "
-                                "You have been given a real screenshot of the user's screen taken right now. "
-                                "Always describe what you can see in the image. "
-                                "You have no memory of previous screenshots or conversations — each request is independent."
-                            )
+                            "content": system
                         },
                         {
                             "role": "user",
@@ -35,7 +42,7 @@ def ask_with_image(question, base64_image, model="local-model", retries=1):
                             ]
                         }
                     ],
-                    "temperature": 0.7,
+                    "temperature": 0.3 if mode == "click" else 0.7,
                     "max_tokens": 1024
                 },
                 timeout=90

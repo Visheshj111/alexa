@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import time
 import numpy as np
 import sounddevice as sd
 from piper import PiperVoice
@@ -65,10 +66,86 @@ def clean_for_speech(text):
     text = text.replace('--', ', ')
     
     # Keep only letters, numbers, whitespace, and basic punctuation
-    text = re.sub(r'[^\w\s\.,!\?:;()\[\]\{}\']', ' ', text)
+    text = re.sub(r"[^\w\s\.,!\?:;()\[\]\{}\']", ' ', text)
     
     # Collapse multiple spaces
     return re.sub(r'\s+', ' ', text).strip()
+
+# ── Barge-in / interruption detection ───────────────────────────────────────
+# During TTS playback, a parallel mic stream monitors for user speech.
+# If the user speaks above the echo threshold, playback stops instantly.
+
+_BARGE_IN_MIC_SR = 16000
+_BARGE_IN_CHECK_MS = 60          # Check mic every 60ms
+_BARGE_IN_CALIBRATION_CHUNKS = 3 # Measure echo level for first ~180ms
+_BARGE_IN_MIN_THRESHOLD = 0.07   # Floor threshold (prevents triggers in dead silence)
+_BARGE_IN_MULTIPLIER = 3.0       # Threshold = echo_level * this
+_BARGE_IN_CONSECUTIVE = 2        # Require 2 consecutive loud chunks (debounce)
+
+
+def _play_with_barge_in(audio_data, sample_rate):
+    """Play audio with barge-in detection.
+    
+    Opens a mic input stream in parallel with audio output.
+    Calibrates against the TTS echo level, then monitors for
+    user speech above that threshold.
+    
+    Returns True if playback was interrupted by user speech.
+    """
+    mic_chunk = int(_BARGE_IN_MIC_SR * _BARGE_IN_CHECK_MS / 1000)
+    duration = len(audio_data) / sample_rate
+    
+    # Start non-blocking playback
+    sd.play(audio_data, sample_rate)
+    
+    try:
+        # Open a separate mic stream to monitor for user speech
+        with sd.InputStream(samplerate=_BARGE_IN_MIC_SR, channels=1,
+                            dtype='float32', blocksize=mic_chunk) as mic:
+            
+            # Phase 1: Calibrate echo level during first ~180ms of playback
+            # This captures how much TTS audio bleeds into the mic
+            echo_levels = []
+            for _ in range(_BARGE_IN_CALIBRATION_CHUNKS):
+                data, _ = mic.read(mic_chunk)
+                echo_levels.append(np.max(np.abs(data)))
+            
+            # Set threshold above echo + ambient, with a hard floor
+            echo_peak = max(echo_levels) if echo_levels else 0.01
+            threshold = max(_BARGE_IN_MIN_THRESHOLD, echo_peak * _BARGE_IN_MULTIPLIER)
+            
+            # Phase 2: Monitor for user speech above threshold
+            elapsed = _BARGE_IN_CALIBRATION_CHUNKS * _BARGE_IN_CHECK_MS / 1000
+            consecutive_loud = 0
+            
+            while elapsed < duration:
+                data, _ = mic.read(mic_chunk)
+                vol = np.max(np.abs(data))
+                
+                if vol > threshold:
+                    consecutive_loud += 1
+                    if consecutive_loud >= _BARGE_IN_CONSECUTIVE:
+                        # User is speaking — kill playback NOW
+                        sd.stop()
+                        print("[BARGE-IN] User interrupted. Stopping playback.")
+                        return True
+                else:
+                    consecutive_loud = 0
+                
+                elapsed += _BARGE_IN_CHECK_MS / 1000
+        
+        # Playback finished naturally — make sure it's fully done
+        sd.wait()
+        return False
+        
+    except Exception as e:
+        # If mic monitoring fails (e.g. no mic), fall back to normal playback
+        try:
+            sd.wait()
+        except Exception:
+            pass
+        return False
+
 
 # ── Pre-cached phrase playback ──────────────────────────────────────────────
 _phrase_audio_cache = {}  # phrase_text -> (audio_float_array, sample_rate)
@@ -87,7 +164,8 @@ def precache_phrases(phrases):
                 _phrase_audio_cache[phrase] = (combined_audio, chunks[0].sample_rate)
 
 def speak_cached(phrase):
-    """Play a pre-cached phrase instantly (<2ms). Falls back to speak() if not cached."""
+    """Play a pre-cached phrase instantly (<2ms). Falls back to speak() if not cached.
+    No barge-in detection — cached phrases are short enough that interruption isn't needed."""
     if phrase in _phrase_audio_cache:
         data, fs = _phrase_audio_cache[phrase]
         sd.play(data, fs)
@@ -96,17 +174,27 @@ def speak_cached(phrase):
         speak(phrase)
 
 def speak(text):
-    """Direct in-memory synthesis and audio playback. Zero disk I/O, zero subprocesses."""
+    """Direct in-memory synthesis and audio playback with barge-in detection.
+    
+    Returns:
+        True if the user interrupted (barge-in detected), False otherwise.
+    """
     text = clean_for_speech(text)
     if not text:
-        return
+        return False
     voice = get_voice()
     for chunk in voice.synthesize(text):
-        sd.play(chunk.audio_float_array, chunk.sample_rate)
-        sd.wait()
+        interrupted = _play_with_barge_in(chunk.audio_float_array, chunk.sample_rate)
+        if interrupted:
+            return True
+    return False
 
 def speak_stream(sentence_generator):
-    """Pipelined streaming playback: speaks sentences as they are yielded by the LLM."""
+    """Pipelined streaming playback: speaks sentences as they are yielded by the LLM.
+    
+    Returns:
+        tuple: (full_text: str, was_interrupted: bool)
+    """
     full_text_list = []
     for sentence in sentence_generator:
         if not sentence:
@@ -114,5 +202,8 @@ def speak_stream(sentence_generator):
         cleaned = clean_for_speech(sentence)
         if cleaned:
             full_text_list.append(cleaned)
-            speak(cleaned)
-    return " ".join(full_text_list)
+            interrupted = speak(cleaned)
+            if interrupted:
+                return " ".join(full_text_list), True
+    return " ".join(full_text_list), False
+

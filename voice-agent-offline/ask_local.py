@@ -1,38 +1,15 @@
 import requests
 import json
 import re
-from memory import build_memory_context
-
-SYSTEM_PROMPT = (
-    "You are a personal voice assistant. Your responses will be read aloud by a text-to-speech engine, "
-    "so write exactly as you would speak — naturally, conversationally, like a knowledgeable friend.\n\n"
-    "Rules you must follow:\n"
-    "- Use contractions: say \"don't\", \"I'm\", \"it's\", \"you'll\" — never formal \"do not\", \"I am\", etc.\n"
-    "- Never start with filler like \"Certainly!\", \"Sure!\", \"Absolutely!\", \"Of course!\", \"Great question!\"\n"
-    "- No markdown — no asterisks, no bullet points, no headers, no code blocks in conversational replies.\n"
-    "- Keep answers to 2-3 sentences unless the user explicitly asks for more detail.\n"
-    "- If something has multiple parts, say them as a natural list in a sentence: "
-    "\"There are three things: first ..., second ..., and third ...\"\n"
-    "- Match the user's energy — if they ask casually, reply casually.\n"
-    "- The user's input comes from speech-to-text, so intelligently infer phonetic mishears "
-    "(e.g. 'chargipiti' means 'ChatGPT', 'jemina' means 'Gemini', 'react jay ess' means 'React.js').\n"
-    "- If you don't know something, say so directly and briefly.\n"
-    "- You have a memory of past conversations. Use it to personalize your responses. "
-    "If the user asks about themselves, your opinions of them, or references past interactions, "
-    "use your memory to give a real, personal answer — never say 'I don't have memory' or "
-    "'I'm just an AI'. You DO remember. Act like it."
-)
+from persona import build_system_prompt, build_context_prompt
 
 def _build_system_with_memory():
-    """Combine the base system prompt with any available memory context."""
-    memory = build_memory_context()
-    if memory:
-        return SYSTEM_PROMPT + "\n\n" + memory
-    return SYSTEM_PROMPT
+    """Build the full system prompt with Jarvis identity + memory context."""
+    return build_system_prompt("text")
 
-def ask(question, model="local-model"):
+def ask(question, model="local-model", system_override=None):
     from memory import get_recent_turns
-    system = _build_system_with_memory()
+    system = system_override if system_override else _build_system_with_memory()
     
     messages = [{"role": "system", "content": system}]
     for turn in get_recent_turns(n=5):
@@ -119,17 +96,7 @@ def ask_stream(question, model="local-model"):
 
 def ask_with_context(question, context_text, model="local-model"):
     """Ask a question about a specific piece of text (e.g. file contents)."""
-    memory = build_memory_context()
-    system = (
-        "You are a personal voice assistant. Your response will be read aloud, "
-        "so reply naturally and conversationally — no markdown, no bullet points, no headers.\n\n"
-        "The user has asked you a question about the contents of a file on their PC. "
-        "The file's contents are provided below between the markers. "
-        "Answer only from the file contents. If the answer isn't in the file, say so directly.\n\n"
-        f"--- FILE CONTENTS ---\n{context_text}\n--- END OF FILE ---"
-    )
-    if memory:
-        system = system + "\n\n" + memory
+    system = build_context_prompt(context_text)
     try:
         response = requests.post(
             "http://localhost:1234/v1/chat/completions",
