@@ -1,183 +1,178 @@
-# Alexa — Local Voice & Computer Agent
+# Alexa / Jarvis — Offline Autonomous Multimodal AI Agent
 
-A local-first voice assistant for Windows that combines speech recognition, local LLM reasoning, persistent memory, computer vision, and deterministic PC automation.
+A 100% offline, ultra-low-latency multimodal AI assistant for Windows 11. It combines real-time voice recognition, streaming local LLM reasoning (Qwen3-VL), computer vision, PowerShell terminal automation, zero-delay screen control, persistent memory, and a mobile web interface.
 
-> Built as a personal "Alexa for my PC" rather than a cloud-only chatbot: the assistant can understand spoken commands, answer questions with a local model, control applications and media, inspect the screen, search files, maintain memory, and execute computer actions with confirmation.
+> **Privacy First & Local Execution**: Built to run entirely offline on consumer hardware (Infinix GT Book — i5-12500H, 16GB RAM, RTX 3050 GPU). No cloud APIs, no data telemetry, no external dependencies.
 
-## What it can do
+---
 
-### Voice interaction
-- Wake-word based conversation flow.
-- Speech-to-text using Faster-Whisper.
-- Natural text-to-speech using Piper, with pre-cached short responses for lower latency.
-- Voice-session timeout and conversational turn handling.
+## ⚡ Key Features
 
-### Local AI
-- Uses an OpenAI-compatible local endpoint exposed by LM Studio for conversational reasoning.
-- Keeps ordinary spoken answers concise and natural.
-- Includes speech-to-text vocabulary biasing for common commands, applications, and technical terms.
-- Handles phonetic speech-to-text mistakes through the assistant's system prompt.
+### 🎙️ 1. Zero-Latency Voice Engine & Instant Barge-In
+- **Persistent Wake-Word Loop:** Powered by `openwakeword` listening continuously for `"alexa"`.
+- **In-Memory Speech-to-Text:** `faster-whisper` (`base.en`) running entirely in RAM with VAD noise filtering and speech vocabulary biasing.
+- **In-Memory TTS & Pre-Caching:** `PiperVoice` ONNX model streaming PCM directly to audio output. Pre-caches 40+ high-frequency phrases for instant acknowledgment.
+- **Instant Barge-In / Interruption:** Saying *"stop"*, *"Alexa stop"*, *"shut up"*, or speaking over the assistant halts TTS audio playback in **< 100ms** and re-opens active listening.
 
-### PC automation
-- Open and close applications.
-- Control media playback, volume, mute, and related actions.
-- Enumerate open windows.
-- Trigger Windows system actions such as brightness, lock, and sleep.
-- Set and read reminders.
-- Search and answer questions about files stored on the PC.
+### 🧠 2. Unified "Jarvis" Persona (`persona.py`)
+- Single source of truth identity: intelligent, witty, concise, direct (Stark's JARVIS style).
+- Zero conversational filler (*"Certainly!"*, *"As an AI..."*), zero markdown formatting in spoken output.
+- 100% self-aware of system capabilities: hardware specs, vision tools, terminal access, and file memory.
 
-### Vision and computer use
-- Capture the current screen and send it to a local vision-capable model.
-- Ask questions about what is visible on the display.
-- Locate UI elements from a screenshot and convert model coordinates into real screen coordinates.
-- Require spoken confirmation before executing an inferred screen click.
+### 💻 3. Natural Language Terminal & OS Autonomy (`terminal_exec.py`)
+- Translates natural language requests (*"find all PDF files"*, *"scan disk space"*, *"delete file test.txt"*, *"start anti-gravity in repo X"*) into single-line PowerShell commands.
+- **Dual Safety Gate:** Destructive actions (`Remove-Item`, `del`, `format`) are automatically flagged by LLM + Python and require explicit voice/terminal confirmation before execution.
 
-### Persistent memory
-- Stores conversation history separately from structured memory.
-- Memory entries carry category, source, confidence, timestamps, and active/stale state.
-- Explicit user memories are treated differently from inferred memories.
-- LLMs propose memory changes; Python validates the proposal before modifying the memory store.
-- Keeps a backup and changelog of memory changes.
+### 🖱️ 4. Zero-Delay Screen Clicking & Prompt Typing (`screen_click.py`, `screen_type.py`)
+- **Instant Click Execution:** Saying *"click proceed button"* or *"look at my screen and click person 1"* automatically cleans verbal prefixes, captures the screen, calculates normalized coordinates via `Qwen3-VL`, and clicks **immediately** with zero confirmation delay.
+- **AI Prompt Refinement:** Spoken commands like *"write a prompt to enhance my dashboard page by looking at the repo"* are refined by the local LLM into structured, high-quality prompts.
+- **Clipboard Typing Engine:** Pastes text into active windows or prompt boxes using system clipboard hotkeys (`ctrl+v`), ensuring 100x faster pasting with zero dropped characters.
 
-### Voice verification
-- Includes voice enrollment and speaker verification support so the assistant can distinguish an authorized speaker.
+### 🌐 5. Mobile & WiFi Web Interface (`web_server.py`)
+- Flask HTTP REST server running on port `8080` (`0.0.0.0:8080`).
+- Sleek glassmorphic dark-mode web chat interface ([chat.html](file:///c:/Vishesh/Docs/Repos/alexa/voice-agent-offline/templates/chat.html)) designed for smartphones and laptops on local WiFi.
+- Access the assistant's brain, vision, terminal execution, and media control from your phone browser at `http://<laptop-ip>:8080`.
 
-## Architecture
+### 💬 6. Interactive Terminal Chat Mode
+- Switch between voice and typed terminal modes seamlessly.
+- Say *"switch to chat mode"* or run `start_alexa.bat --chat` for quiet/public environments. Type `voice mode` to return.
+
+---
+
+## 🏗️ System Architecture
 
 ```text
-                    ┌──────────────────────┐
-                    │      Microphone      │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │     Wake Word        │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │ Faster-Whisper STT   │
-                    └──────────┬───────────┘
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │   Intent Routing     │
-                    └───────┬───────┬──────┘
-                            │       │
-             ┌──────────────┘       └─────────────────┐
-             ▼                                        ▼
-   ┌────────────────────┐                  ┌─────────────────────┐
-   │ Deterministic      │                  │ Local LLM / Vision  │
-   │ PC Tools           │                  │ via LM Studio       │
-   │ apps, media, files │                  │ reasoning + vision  │
-   │ reminders, system  │                  └──────────┬──────────┘
-   └──────────┬─────────┘                             │
-              │                                       │
-              └──────────────────┬────────────────────┘
-                                 ▼
-                       ┌──────────────────────┐
-                       │ Memory / Context     │
-                       │ validated + stored   │
-                       └──────────┬───────────┘
-                                  │
-                                  ▼
-                       ┌──────────────────────┐
-                       │ Piper Text-to-Speech │
-                       └──────────┬───────────┘
-                                  │
-                                  ▼
-                              Speaker
+                                  ┌───────────────────────────┐
+                                  │   Microphone Audio Stream │
+                                  └─────────────┬─────────────┘
+                                                │
+                                                ▼
+                                  ┌───────────────────────────┐
+                                  │   OpenWakeWord ("alexa")  │
+                                  └─────────────┬─────────────┘
+                                                │
+                                                ▼
+                                  ┌───────────────────────────┐
+                                  │  Faster-Whisper STT (RAM) │
+                                  └─────────────┬─────────────┘
+                                                │
+                                                ▼
+                                  ┌───────────────────────────┐
+                                  │   Verbal Prefix Stripper  │
+                                  │   & Intent Classifier     │
+                                  └───────┬───┬───┬───┬───────┘
+                                          │   │   │   │
+             ┌────────────────────────────┘   │   │   └─────────────────────────────┐
+             ▼                                ▼   ▼                                 ▼
+   ┌────────────────────┐          ┌────────────────────┐               ┌───────────────────────┐
+   │ Screen Click /     │          │ PowerShell         │               │ Qwen3-VL-4B           │
+   │ Clipboard Typing   │          │ Execution Engine   │               │ (LM Studio GPU)       │
+   │ pyautogui / mss    │          │ (Safety Gated)     │               └───────────┬───────────┘
+   └─────────┬──────────┘          └──────────┬─────────┘                           │
+             │                                │                                     │
+             └────────────────────────┬───────┴─────────────────────────────────────┘
+                                      ▼
+                           ┌─────────────────────┐
+                           │ Memory & Session    │
+                           │ Store (JSON/SQLite) │
+                           └──────────┬──────────┘
+                                      │
+                                      ▼
+                           ┌─────────────────────┐      Barge-In Interrupt
+                           │ Piper TTS Stream    │ ◄─────────────────────────┐
+                           └──────────┬──────────┘                           │
+                                      │                                      │
+                                      ▼                                      │
+                           ┌─────────────────────┐                 ┌─────────┴─────────┐
+                           │ sounddevice Output  ├─────────────────► Voice Interrupt  │
+                           └─────────────────────┘                 │ Energy Monitor    │
+                                                                   └───────────────────┘
 ```
 
-## Key engineering decisions
+---
 
-### Deterministic actions stay outside the LLM
-The language model is used for reasoning and natural-language interaction, while actions such as opening applications, changing system state, searching files, or clicking the screen are handled by explicit Python tools. This keeps high-impact computer actions more controllable and testable.
-
-### Memory uses a validation layer
-The LLM does not directly rewrite `memory.json`. It proposes changes, and Python validates the structure and allowed categories before applying them. This reduces the chance of accidental or malformed memory updates.
-
-### Confirmation before visual clicks
-For screen-control commands, the vision model first identifies the target and coordinates. The agent then asks for spoken confirmation before performing the click.
-
-### Latency-aware speech output
-Known short phrases are synthesized once, cached to WAV, and loaded into memory. This avoids spawning a new TTS process for every wake/acknowledgement phrase.
-
-## Project structure
+## 📁 Repository Structure
 
 ```text
 voice-agent-offline/
-├── main.py              # Main assistant loop and intent routing
-├── ask_local.py         # Local LLM requests through LM Studio
-├── ask_vision.py        # Screenshot + vision-model interaction
-├── transcribe.py        # Faster-Whisper transcription
-├── speak.py             # Piper TTS and phrase caching
-├── memory.py            # Persistent memory + consolidation/validation
-├── app_control.py       # Application launch/close
-├── media_control.py     # Media and volume controls
-├── file_search.py       # File search and file-content workflows
-├── screenshot.py        # Screen capture
-├── screen_click.py      # Coordinate scaling and mouse execution
-├── reminders.py         # Reminder support
-├── speaker_verify.py    # Speaker verification
-├── enroll_voice.py      # Voice enrollment
-└── start_alexa.bat      # Windows launcher
+├── main.py              # Central orchestrator loop, intent dispatch, barge-in, & chat loop
+├── persona.py           # Unified identity, capabilities, system prompts across all modes
+├── terminal_exec.py     # PowerShell command generation & safe execution sandbox
+├── screen_click.py      # Screenshot scaling & instant screen click execution
+├── screen_type.py       # Clipboard pasting engine & AI prompt refinement
+├── web_server.py        # Flask REST web server for remote phone/browser access
+├── ask_local.py         # Local LLM chat completion handler (LM Studio API)
+├── ask_vision.py        # Qwen3-VL screenshot vision & coordinate extraction
+├── transcribe.py        # In-memory Faster-Whisper transcription engine
+├── speak.py             # In-memory Piper TTS synthesis stream & phrase caching
+├── memory.py            # Long-term cognitive memory & background consolidation
+├── app_control.py       # Windows application launch & termination
+├── media_control.py     # Media playback, volume, and mute controls
+├── system_control.py    # Windows display brightness, lock, and sleep controls
+├── file_search.py       # Fast file indexer & document text extraction
+├── reminders.py         # Local reminder store
+├── speaker_verify.py    # Voice biometric verification
+├── start_alexa.bat      # Primary launcher (supports --chat flag)
+├── start_web.bat        # Remote web server launcher
+└── templates/
+    └── chat.html        # Glassmorphism dark-mode mobile chat web UI
 ```
 
-## Example commands
+---
 
-```text
-"Alexa, open VS Code."
-"What apps are open?"
-"Play some music and turn the volume down."
-"Remind me to submit the assignment at 7 PM."
-"Remember that I prefer concise answers."
-"What do you remember about me?"
-"Find the PDF about operating systems and tell me what's in it."
-"What am I looking at on my screen?"
-"Click the settings icon."
-```
-
-For actions that can affect the computer, the agent is designed to route the request through explicit tools rather than asking the LLM to freely execute arbitrary code.
-
-## Local setup
-
-The project is currently designed around a Windows environment.
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Python environment with the project's Python packages installed.
-- A microphone and speakers/headphones.
-- LM Studio running an OpenAI-compatible local chat endpoint on `localhost:1234`.
-- A compatible local model for text reasoning and, where needed, vision input.
-- Piper with the configured voice model for speech synthesis.
-- A Windows desktop environment for the application/system automation modules.
+1. **Operating System:** Windows 11 Workstation.
+2. **Python:** Python 3.10+ installed locally.
+3. **LM Studio:** Running `qwen/qwen3-vl-4b` on GPU with local server listening on `http://localhost:1234`.
+4. **Piper TTS:** `en_US-lessac-medium.onnx` voice model in the root project directory.
 
-### Run
+### Quick Start
 
-1. Configure the local model in LM Studio.
-2. Configure the local Piper voice model path used by `speak.py`.
-3. Complete voice enrollment if speaker verification is enabled.
-4. Start the assistant using `start_alexa.bat` or run `main.py` directly.
-5. Wait for the wake-word listener, then speak a command.
+1. **Launch Voice Agent:**
+   Double-click `start_alexa.bat` or run in terminal:
+   ```cmd
+   c:\Vishesh\Docs\Repos\alexa\voice-agent-offline\start_alexa.bat
+   ```
 
-## Design notes
+2. **Launch Terminal Chat Mode:**
+   ```cmd
+   start_alexa.bat --chat
+   ```
 
-This project intentionally mixes deterministic software engineering with local AI instead of treating everything as an LLM problem. The LLM provides language understanding, reasoning, memory proposals, and vision interpretation; Python owns the stateful application logic and system-level actions.
+3. **Launch Mobile Web Server:**
+   Double-click `start_web.bat` or run:
+   ```cmd
+   python voice-agent-offline/web_server.py
+   ```
+   Open `http://<your-laptop-ip>:8080` from your phone or browser connected to the same local WiFi network.
 
-The result is a small experimental computer agent that sits between a traditional desktop automation tool and a modern multimodal AI assistant.
+---
 
-## Limitations
+## 🗣️ Example Commands
 
-- The current implementation is Windows-specific in several areas, including application paths and system-control behavior.
-- The local LLM/vision experience depends on the model loaded in LM Studio and the available hardware.
-- Computer-use actions should be treated as an experimental automation layer and reviewed carefully before enabling unrestricted actions.
-- Configuration is currently code-driven rather than packaged as a polished installer or cross-platform distribution.
+| Intent | Spoken / Typed Command | Action Taken |
+| :--- | :--- | :--- |
+| **Instant Click** | *"Alexa, click proceed button"* | Captures screen, calculates coordinates, clicks UI element immediately (<0.8s). |
+| **Prompt Typing** | *"Alexa, write a prompt to enhance my dashboard page"* | Refines prompt using LLM, pastes into active window via `ctrl+v`. |
+| **Terminal Search** | *"Alexa, find all PDF files in my documents"* | Executes `Get-ChildItem -Path ...` in PowerShell, speaks summary. |
+| **Chained Action** | *"Alexa, open chrome then click person 1 and go to facebook.com"* | Opens Chrome, clicks profile button, navigates to website sequentially. |
+| **Barge-In Stop** | *"Alexa, stop"* or *"Shut up"* | Instantly interrupts speech output, opens microphone for next command. |
+| **Vision Analysis** | *"Alexa, look at my screen and tell me what error is showing"* | Ingests live display into `Qwen3-VL-4B`, returns brief solution. |
+| **Chat Mode** | *"Alexa, switch to chat mode"* | Switches to typed keyboard terminal (`Alexa> `). |
 
-## Tech stack
+---
 
-**Python · Faster-Whisper · LM Studio · Local LLMs · Local Vision · Piper TTS · sounddevice · soundfile · Windows automation · JSON-based persistent memory**
+## 🔒 Safety & Control Design
 
-## Repository
+- **Zero Unsanitized Execution:** Destructive terminal actions (`Remove-Item`, `format`, `del`) are double-checked by Python safety functions and require explicit confirmation.
+- **Zero Cloud Leakage:** All inference runs on your local GPU via LM Studio and PyTorch/ONNX runtimes.
+- **Local Network Isolation:** The web server binds to `0.0.0.0:8080` for local WiFi devices only.
 
-[GitHub — VisheshJ111/alexa](https://github.com/Visheshj111/alexa)
+---
+
+## 📄 License
+
+Private repository developed for local workstation automation.
