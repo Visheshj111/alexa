@@ -8,6 +8,7 @@ from screenshot import capture_screen_base64
 from ask_vision import ask_with_image
 from window_enum import get_open_windows
 from terminal_exec import generate_command, execute_command, summarize_output_for_speech, is_destructive
+from typesafe_router import classify_intent_with_jev, is_jev_enabled
 import sounddevice as sd
 import soundfile as sf
 import re
@@ -32,6 +33,19 @@ def clean_command_text(text):
 def get_intent(text):
     cleaned = clean_command_text(text).lower()
     
+    # 1. Deterministic instant fast-path (<1ms) for exact matches
+    if cleaned in ["shutdown", "exit", "quit", "power off", "shut down"]:
+        return "shutdown"
+    if cleaned in ["stop listening", "stop", "pause listening"]:
+        return "stop_listening"
+
+    # 2. TypeSafe AI Jev System One Model (<100ms typed probabilistic classification)
+    if is_jev_enabled():
+        jev_intent, _ = classify_intent_with_jev(cleaned)
+        if jev_intent:
+            return jev_intent
+
+    # 3. Local heuristic rule engine (fallback / 100% offline path)
     if cleaned.startswith("remind me"):
         return "reminder"
         

@@ -91,7 +91,8 @@ flowchart TD
         Vision --> Dispatcher
         MemoryStore[("Persistent Cognitive Memory")] <--> Dispatcher
         Dispatcher <--> FastPath["Regex Fast-Path (<1ms)"]
-        Dispatcher <--> QwenLLM["Local Qwen3-VL Reasoning Core"]
+        Dispatcher <--> JevSystemOne["TypeSafe AI Jev (System One Router ~70-150ms)"]
+        Dispatcher <--> QwenLLM["Local Qwen3-VL Reasoning Core (System Two)"]
     end
 
     subgraph ACTUATION ["Actuation & Output Layer"]
@@ -114,9 +115,10 @@ flowchart TD
 - **Function:** Central state machine and decision maker.
 - **Workflow:**
   1. Receives transcribed user text.
-  2. Evaluates fast-path heuristics (<1ms) for high-frequency deterministic actions (media, volume, quick app launch).
-  3. Dispatches complex conversational, visual, or multi-step reasoning tasks to the local Qwen model.
-  4. Coordinates the streaming response pipeline to ensure speech output begins on sentence one.
+  2. Evaluates fast-path heuristics (<1ms) for high-frequency deterministic actions.
+  3. Uses **TypeSafe AI's Jev (System One)** for ultra-fast (70–150ms) typed, probabilistic intent routing (`Choice`, `Score`, `Noul`) with calibrated confidence levels.
+  4. Dispatches complex conversational, visual, or multi-step reasoning tasks to the local Qwen model (**System Two**).
+  5. Coordinates the streaming response pipeline to ensure speech output begins on sentence one.
 
 #### 2. **Perception & Audio Ingest Agent (`Perception-Core`)**
 - **Function:** Real-time audio listener and screen vision provider.
