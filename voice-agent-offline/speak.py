@@ -90,7 +90,6 @@ def _play_with_barge_in(audio_data, sample_rate):
         sd.wait()
         return False
 
-    mic_chunk = int(_BARGE_IN_MIC_SR * _BARGE_IN_CHECK_MS / 1000)
     duration = len(audio_data) / sample_rate
     
     # Start non-blocking playback

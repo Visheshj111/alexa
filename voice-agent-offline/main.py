@@ -112,6 +112,14 @@ def get_intent(text):
     if any(kw in cleaned for kw in ["open apps", "open windows", "what's open", "running right now", "list windows", "what apps"]):
         return {"intent": "windows", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
+    # Mode switch & improve (V1 heuristics)
+    if any(kw in cleaned for kw in ["switch to version 2", "control to jev", "version 2.0"]):
+        return {"intent": "mode_switch", "payload": "V2", "target": None, "tool_preference": "none", "delegation_route": "none"}
+    if any(kw in cleaned for kw in ["switch to version 1", "control to local", "version 1.0", "revert back"]):
+        return {"intent": "mode_switch", "payload": "V1", "target": None, "tool_preference": "none", "delegation_route": "none"}
+    if any(kw in cleaned for kw in ["improve yourself", "add a feature", "improve the codebase", "write code", "start antigravity", "use antigravity", "use terminal to", "use opencode", "delegate"]):
+        return {"intent": "improve_codebase", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "external_agent"}
+
     # Fast app launch & close
     if any(cleaned.startswith(p) for p in ["open ", "launch ", "start "]):
         return {"intent": "app_open", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
@@ -138,13 +146,6 @@ def get_intent(text):
     if any(cleaned.startswith(p) for p in ["run a", "run the", "execute", "terminal", "powershell"]) or any(kw in cleaned for kw in ["disk space", "storage space", "free space", "running processes"]):
         return {"intent": "terminal", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
-    # Mode switch & improve (V1 heuristics)
-    if any(kw in cleaned for kw in ["switch to version 2", "control to jev", "version 2.0"]):
-        return {"intent": "mode_switch", "payload": "V2", "target": None, "tool_preference": "none", "delegation_route": "none"}
-    if any(kw in cleaned for kw in ["switch to version 1", "control to local", "version 1.0", "revert back"]):
-        return {"intent": "mode_switch", "payload": "V1", "target": None, "tool_preference": "none", "delegation_route": "none"}
-    if any(kw in cleaned for kw in ["improve yourself", "add a feature", "improve the codebase", "write code"]):
-        return {"intent": "improve_codebase", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # 2. TypeSafe AI Jev System One Model (~70ms for natural/paraphrased/ambiguous intent) - Fallback for V1
     if ROUTER_MODE == "V1" and is_jev_enabled():
