@@ -76,21 +76,14 @@ def clean_for_speech(text):
 # If the user speaks above the echo threshold, playback stops instantly.
 
 _BARGE_IN_MIC_SR = 16000
-_BARGE_IN_CHECK_MS = 60          # Check mic every 60ms
-_BARGE_IN_CALIBRATION_CHUNKS = 3 # Measure echo level for first ~180ms
-_BARGE_IN_MIN_THRESHOLD = 0.07   # Floor threshold (prevents triggers in dead silence)
-_BARGE_IN_MULTIPLIER = 3.0       # Threshold = echo_level * this
-_BARGE_IN_CONSECUTIVE = 2        # Require 2 consecutive loud chunks (debounce)
 
 
-ENABLE_BARGE_IN = os.environ.get("ENABLE_BARGE_IN", "0") == "1"
+ENABLE_BARGE_IN = os.environ.get("ENABLE_BARGE_IN", "1") == "1"
 
 def _play_with_barge_in(audio_data, sample_rate):
-    """Play audio with barge-in detection.
+    """Play audio with keyword-based barge-in detection.
     
-    By default, barge-in is disabled to prevent speaker-to-mic acoustic feedback
-    from interrupting the assistant while it speaks.
-    Set ENABLE_BARGE_IN=1 in your environment if you are using headphones with AEC.
+    If you say 'Alexa' while the assistant is speaking, it will immediately stop.
     """
     if not ENABLE_BARGE_IN:
         sd.play(audio_data, sample_rate)
@@ -104,40 +97,31 @@ def _play_with_barge_in(audio_data, sample_rate):
     sd.play(audio_data, sample_rate)
     
     try:
-        # Open a separate mic stream to monitor for user speech
-        with sd.InputStream(samplerate=_BARGE_IN_MIC_SR, channels=1,
-                            dtype='float32', blocksize=mic_chunk) as mic:
+        from wake_word import _wake_model
+        _wake_model.reset()
+        
+        # Open a 16000Hz int16 stream specifically for the wake word model
+        with sd.InputStream(samplerate=16000, channels=1,
+                            dtype='int16', blocksize=1280) as mic:
             
-            # Phase 1: Calibrate echo level during first ~180ms of playback
-            # This captures how much TTS audio bleeds into the mic
-            echo_levels = []
-            for _ in range(_BARGE_IN_CALIBRATION_CHUNKS):
-                data, _ = mic.read(mic_chunk)
-                echo_levels.append(np.max(np.abs(data)))
-            
-            # Set threshold above echo + ambient, with a hard floor
-            echo_peak = max(echo_levels) if echo_levels else 0.01
-            threshold = max(_BARGE_IN_MIN_THRESHOLD, echo_peak * _BARGE_IN_MULTIPLIER)
-            
-            # Phase 2: Monitor for user speech above threshold
-            elapsed = _BARGE_IN_CALIBRATION_CHUNKS * _BARGE_IN_CHECK_MS / 1000
-            consecutive_loud = 0
-            
-            while elapsed < duration:
-                data, _ = mic.read(mic_chunk)
-                vol = np.max(np.abs(data))
+            # Flush the initial buffer to avoid immediate false positives from echo
+            for _ in range(3):
+                mic.read(1280)
                 
-                if vol > threshold:
-                    consecutive_loud += 1
-                    if consecutive_loud >= _BARGE_IN_CONSECUTIVE:
-                        # User is speaking — kill playback NOW
-                        sd.stop()
-                        print("[BARGE-IN] User interrupted. Stopping playback.")
-                        return True
-                else:
-                    consecutive_loud = 0
+            import time
+            start_time = time.time()
+            
+            # Poll the microphone while the audio is still playing
+            while time.time() - start_time < duration:
+                audio_chunk, _ = mic.read(1280)
+                audio_data = audio_chunk.flatten()
+                prediction = _wake_model.predict(audio_data)
                 
-                elapsed += _BARGE_IN_CHECK_MS / 1000
+                if prediction.get("alexa", 0) > 0.5:
+                    # User said "Alexa" — kill playback NOW
+                    sd.stop()
+                    print("[BARGE-IN] Wake word 'Alexa' detected. Stopping playback.")
+                    return True
         
         # Playback finished naturally — make sure it's fully done
         sd.wait()
