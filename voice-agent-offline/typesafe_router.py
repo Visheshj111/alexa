@@ -118,7 +118,7 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> d
         return None
 
     try:
-        from typesafe_sdk import Choice, Noul
+        from typesafe_sdk import Choice
 
         response = client.system_one(
             state=text,
@@ -126,12 +126,6 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> d
                 "intent": Choice(
                     instructions="Identify the primary intent or action requested by the user.",
                     criteria=JEV_INTENT_CRITERIA
-                ),
-                "target": Noul(
-                    instructions="If the user specified a target app, window, setting, or file, extract it here. (e.g. 'chrome', 'spotify', 'volume')"
-                ),
-                "payload": Noul(
-                    instructions="If the user specified text to type, a search query, a URL, or specific instructions, extract it here."
                 ),
                 "tool_preference": Choice(
                     instructions="If the user specified an external tool for coding or delegation, extract it.",
@@ -161,23 +155,31 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> d
             confidence = choice_ans.confidence
             
             if confidence >= confidence_threshold:
-                target = response.nouls.get("target")
-                payload = response.nouls.get("payload")
                 tool_pref = response.choices.get("tool_preference")
                 tool_pref_val = tool_pref.choice if tool_pref and tool_pref.confidence > 0.5 else "none"
                 del_route = response.choices.get("delegation_route")
                 del_route_val = del_route.choice if del_route and del_route.confidence > 0.5 else "none"
                 
+                # JEV system_one is for classification, not string extraction.
+                # Provide the raw text as payload. Specific handlers will clean it up if needed.
+                payload = text
+                if intent == "type" and text.lower().startswith("type "):
+                    payload = text[5:].strip()
+                elif intent == "type" and text.lower().startswith("type in the text box that "):
+                    payload = text[26:].strip()
+                elif intent == "type" and text.lower().startswith("type in the text box "):
+                    payload = text[21:].strip()
+                
                 result = {
                     "intent": intent,
-                    "target": target,
+                    "target": None,
                     "payload": payload,
                     "tool_preference": tool_pref_val,
                     "delegation_route": del_route_val,
                     "confidence": confidence
                 }
                 
-                print(f"[JEV System One] Decision: '{intent}' (target: {target}, payload: {payload}, tool: {tool_pref_val}, route: {del_route_val})")
+                print(f"[JEV System One] Decision: '{intent}' (tool: {tool_pref_val}, route: {del_route_val})")
                 _decision_cache[norm_text] = result
                 return result
             else:

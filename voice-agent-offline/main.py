@@ -261,71 +261,32 @@ def handle_click_intent(question, record_clip_fn, transcribe_fn, speak_fn):
 
 
 def handle_type_intent(question, payload, speak_fn, record_clip_fn=None, transcribe_fn=None, get_input_fn=None):
-    import json
-    from ask_vision import ask_with_image
-    from screenshot import capture_screen_base64
     from screen_type import click_and_type, type_text
     
     current_request = payload if payload else question
     
-    while True:
-        try:
-            image_b64 = capture_screen_base64()
-            response = ask_with_image(current_request, image_b64, mode="interactive_type")
+    # If the user specifically said "type in the <target> that <text>", 
+    # we can try to extract the target visually if they used keywords like "text box", "search bar", etc.
+    # Otherwise, just type it instantly to save ~5 seconds of visual processing.
+    target = None
+    lower_req = question.lower()
+    if " in the " in lower_req:
+        import re
+        match = re.search(r'in the (.*?) (that|to|saying|:)', lower_req)
+        if match:
+            target = match.group(1).strip()
             
-            # Clean JSON block
-            json_str = response.strip()
-            if json_str.startswith("```json"):
-                json_str = json_str[7:]
-            elif json_str.startswith("```"):
-                json_str = json_str[3:]
-            if json_str.endswith("```"):
-                json_str = json_str[:-3]
-            json_str = json_str.strip()
-            
-            data = json.loads(json_str)
-        except Exception as e:
-            print(f"[TYPE] JSON Parse Error: {e}\nFalling back to direct typing.")
-            # Fallback to dumb typing
+    if target:
+        speak_fn(f"Typing into {target}...")
+        success = click_and_type(target, current_request)
+        if not success:
             type_text(current_request)
-            speak_fn("Done.")
-            return
-
-        action = data.get("action")
-        if action == "ask":
-            q = data.get("question", "Could you clarify?")
-            speak_fn(q)
-            
-            # Get user clarification
-            reply = ""
-            if get_input_fn:
-                reply = get_input_fn("User clarification: ")
-            elif record_clip_fn and transcribe_fn:
-                audio = record_clip_fn(wait_timeout=5.0)
-                if audio is not None:
-                    reply = transcribe_fn(audio)
-            
-            if not reply:
-                speak_fn("Nevermind.")
-                return
-            
-            current_request += f"\nUser clarification: {reply}"
-            
-        elif action == "type":
-            text_to_type = data.get("text", "")
-            target_element = data.get("target_element")
-            if target_element:
-                speak_fn(f"Typing into {target_element}...")
-                success = click_and_type(target_element, text_to_type)
-                if not success:
-                    type_text(text_to_type)
-            else:
-                type_text(text_to_type)
-            speak_fn("Done.")
-            return
-        else:
-            type_text(current_request)
-            return
+    else:
+        # Instant direct typing (0ms latency!)
+        type_text(current_request)
+        
+    speak_fn("Done.")
+    return
 
 
 def handle_web_navigate_intent(question, speak_fn):
