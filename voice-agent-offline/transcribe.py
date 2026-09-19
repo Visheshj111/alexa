@@ -1,10 +1,12 @@
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["OMP_NUM_THREADS"] = "2"
+os.environ["MKL_NUM_THREADS"] = "2"
 import numpy as np
 from faster_whisper import WhisperModel
 
-# Use base.en on CPU with 4 threads for sub-350ms transcription
-model = WhisperModel("base.en", device="cpu", compute_type="int8", cpu_threads=4)
+# Use tiny.en with cpu_threads=2 for ultra-low latency and minimal memory footprint
+model = WhisperModel("tiny.en", device="cpu", compute_type="int8", cpu_threads=2)
 
 VOCAB_PROMPT = (
     "pause play skip next previous volume mute unmute louder quieter "

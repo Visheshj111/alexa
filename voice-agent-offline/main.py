@@ -1,3 +1,8 @@
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["OMP_NUM_THREADS"] = "2"
+os.environ["MKL_NUM_THREADS"] = "2"
+
 from wake_word import listen_for_wake_word
 from speaker_verify import verify_speaker
 from transcribe import transcribe_audio

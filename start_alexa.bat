@@ -1,5 +1,5 @@
 @echo off
-cd /d "c:\Vishesh\Docs\Repos\alexa\voice-agent-offline"
+cd /d "%~dp0voice-agent-offline"
 
 if "%1"=="--chat" (
     echo Starting Assistant in Chat Mode...
@@ -9,3 +9,4 @@ if "%1"=="--chat" (
     python main.py
 )
 pause
+
