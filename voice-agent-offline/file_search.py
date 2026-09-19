@@ -1,5 +1,8 @@
 import os
 import glob
+from pathlib import Path
+
+home = str(Path.home())
 
 # Map spoken folder aliases to absolute paths on disk.
 # The AI will try to match words you say against these keys.
