@@ -83,15 +83,20 @@ _BARGE_IN_MULTIPLIER = 3.0       # Threshold = echo_level * this
 _BARGE_IN_CONSECUTIVE = 2        # Require 2 consecutive loud chunks (debounce)
 
 
+ENABLE_BARGE_IN = os.environ.get("ENABLE_BARGE_IN", "0") == "1"
+
 def _play_with_barge_in(audio_data, sample_rate):
     """Play audio with barge-in detection.
     
-    Opens a mic input stream in parallel with audio output.
-    Calibrates against the TTS echo level, then monitors for
-    user speech above that threshold.
-    
-    Returns True if playback was interrupted by user speech.
+    By default, barge-in is disabled to prevent speaker-to-mic acoustic feedback
+    from interrupting the assistant while it speaks.
+    Set ENABLE_BARGE_IN=1 in your environment if you are using headphones with AEC.
     """
+    if not ENABLE_BARGE_IN:
+        sd.play(audio_data, sample_rate)
+        sd.wait()
+        return False
+
     mic_chunk = int(_BARGE_IN_MIC_SR * _BARGE_IN_CHECK_MS / 1000)
     duration = len(audio_data) / sample_rate
     

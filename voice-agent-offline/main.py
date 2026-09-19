@@ -13,7 +13,7 @@ from screenshot import capture_screen_base64
 from ask_vision import ask_with_image
 from window_enum import get_open_windows
 from terminal_exec import generate_command, execute_command, summarize_output_for_speech, is_destructive
-from typesafe_router import classify_intent_with_jev, is_jev_enabled
+from typesafe_router import classify_intent_with_jev, is_jev_enabled, warmup_jev
 import sounddevice as sd
 import soundfile as sf
 import re
@@ -38,101 +38,78 @@ def clean_command_text(text):
 def get_intent(text):
     cleaned = clean_command_text(text).lower()
     
-    # 1. Deterministic instant fast-path (<1ms) for exact matches
+    # 1. Deterministic instant fast-paths (<0.1ms) for common commands
     if cleaned in ["shutdown", "exit", "quit", "power off", "shut down"]:
         return "shutdown"
     if cleaned in ["stop listening", "stop", "pause listening"]:
         return "stop_listening"
-
-    # 2. TypeSafe AI Jev System One Model (<100ms typed probabilistic classification)
-    if is_jev_enabled():
-        jev_intent, _ = classify_intent_with_jev(cleaned)
-        if jev_intent:
-            return jev_intent
-
-    # 3. Local heuristic rule engine (fallback / 100% offline path)
+    if cleaned in ["switch to chat", "chat mode", "text mode", "type mode", "typing mode"]:
+        return "chat_mode"
+        
     if cleaned.startswith("remind me"):
         return "reminder"
-        
     if any(kw in cleaned for kw in ["what are my reminders", "list my reminders", "read my reminders", "do i have any reminders"]):
         return "list_reminders"
 
-    if any(kw in cleaned for kw in ["remember that", "remember this", "don't forget", "change what you remember", "change my preference"]):
+    if any(kw in cleaned for kw in ["remember that", "remember this", "don't forget", "change what you remember"]):
         return "remember"
-
     if any(kw in cleaned for kw in ["forget that", "forget about", "stop remembering"]):
         return "forget"
-
-    if any(kw in cleaned for kw in ["stop listening", "don't listen", "do not listen", "avoid listening"]):
-        return "stop_listening"
-
-    if any(kw in cleaned for kw in ["switch to chat", "chat mode", "text mode", "type mode", "typing mode"]):
-        return "chat_mode"
 
     if "blocklock" in cleaned or any(kw in cleaned for kw in ["block application", "block app", "block site", "block website"]):
         return "blocklock"
 
-    if any(kw in cleaned for kw in ["shut down", "go to sleep forever", "turn off", "exit", "quit", "power off"]):
-        return "shutdown"
-
-    # Web browsing & website navigation (check BEFORE generic app open)
+    # Web browsing & website navigation
     if (cleaned.startswith("go to ") or cleaned.startswith("navigate to ") or cleaned.startswith("open site ") or cleaned.startswith("open website ")) and any(ext in cleaned for ext in [".com", ".org", ".net", ".io", ".gov", "facebook", "youtube", "google", "github", "twitter", "x.com", "reddit"]):
         return "web_navigate"
     if any(domain in cleaned for domain in ["facebook.com", "youtube.com", "google.com", "github.com", "twitter.com", "x.com", "reddit.com"]):
         return "web_navigate"
 
-    # Type / prompt writing intent (check BEFORE generic app open and vision)
-    if any(kw in cleaned for kw in [
-        "type ", "write a prompt", "write prompt", "type prompt", "type a prompt",
-        "enter text", "write this", "put text", "input text", "enter prompt",
-        "write a", "write the prompt"
-    ]) or ("type" in cleaned and "typing mode" not in cleaned):
+    # Type / prompt writing intent (check BEFORE generic app open)
+    if any(cleaned.startswith(p) for p in ["type ", "write prompt", "write a prompt", "enter text", "put text", "enter prompt"]):
         return "type"
 
-    # Screen Click intent (check BEFORE generic app open and vision)
-    if any(kw in cleaned for kw in ["click", "press the", "tap the", "select the"]):
+    # Screen Click intent
+    if any(cleaned.startswith(p) for p in ["click", "press the", "tap the", "select the"]):
         return "click"
         
-    # Check BEFORE generic app open
+    # Check open windows
     if any(kw in cleaned for kw in ["open apps", "open windows", "what's open", "running right now", "list windows", "what apps"]):
         return "windows"
 
-    if any(kw in cleaned for kw in ["open ", "launch ", "start "]):
+    # Fast app launch & close
+    if any(cleaned.startswith(p) for p in ["open ", "launch ", "start "]):
         return "app_open"
-
-    if any(kw in cleaned for kw in ["close ", "kill ", "quit ", "shut ", "terminate "]) and not any(kw in cleaned for kw in ["shut down", "quit", "exit"]):
+    if any(cleaned.startswith(p) for p in ["close ", "kill ", "quit ", "shut ", "terminate "]) and not any(kw in cleaned for kw in ["shut down", "quit", "exit"]):
         return "app_close"
 
-    if any(kw in cleaned for kw in ["find a file", "search for a file", "find the file", "read the file", "what's in the file", "file called", "file named", "search in"]):
+    # File search
+    if any(kw in cleaned for kw in ["find a file", "search for a file", "find the file", "read the file", "file called", "file named", "search in"]):
         return "file_search"
 
-    if any(kw in cleaned for kw in ["brightness", "lock screen", "lock the screen", "lock my pc", "lock my computer", "sleep", "go to sleep", "put the pc to sleep", "put the computer to sleep"]):
+    # System control
+    if any(kw in cleaned for kw in ["brightness", "lock screen", "lock the screen", "lock my pc", "lock my computer", "sleep", "go to sleep", "put the pc to sleep"]):
         return "system"
 
-    if any(kw in cleaned for kw in ["play", "pause", "skip", "next song", "previous song", "volume", "mute", "unmute", "louder", "quieter", "turn it up", "turn it down", "stop the music", "start the music"]):
+    # Media control
+    if any(kw in cleaned for kw in ["play", "pause", "resume", "skip", "next song", "previous song", "volume", "mute", "unmute", "louder", "quieter", "turn it up", "turn it down"]):
         return "media"
 
+    # Vision requests
     if any(kw in cleaned for kw in ["screen", "looking at", "read this", "see this", "on my display", "what am i looking at"]):
         return "vision"
 
-    # Terminal / command execution
-    if any(kw in cleaned for kw in [
-        "run a", "run the", "execute", "terminal", "powershell", "command line",
-        "find all", "list all", "get all", "get me all", "search all",
-        "delete this", "delete the", "delete that", "remove this", "remove the",
-        "deep search", "scan my", "scan the", "scan for",
-        "how many files", "count the", "count all",
-        "rename this", "rename the", "move this", "move the",
-        "create a folder", "make a folder", "new folder",
-        "open the folder", "open folder",
-        "what's in the folder", "what is in the folder",
-        "disk space", "storage space", "free space",
-        "running processes", "what processes",
-    ]):
+    # Terminal / system commands
+    if any(cleaned.startswith(p) for p in ["run a", "run the", "execute", "terminal", "powershell"]) or any(kw in cleaned for kw in ["disk space", "storage space", "free space", "running processes"]):
         return "terminal"
 
-    return "text"
+    # 2. TypeSafe AI Jev System One Model (~70ms for natural/paraphrased/ambiguous intent)
+    if is_jev_enabled():
+        jev_intent, _ = classify_intent_with_jev(cleaned)
+        if jev_intent:
+            return jev_intent
 
+    return "text"
 
 def split_commands(text):
     cleaned_input = clean_command_text(text)
@@ -336,6 +313,9 @@ def main_loop():
         "System entering sudo sleep.",
         "Saving progress before shutting down."
     ]
+
+    # Pre-warm TypeSafe AI Jev System One connection concurrently in background
+    warmup_jev()
 
     # Pre-cache all known short phrases at startup — first run synthesizes,
     # subsequent runs load from disk. Playing from RAM is ~5ms vs ~1500ms.

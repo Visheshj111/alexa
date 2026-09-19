@@ -5,6 +5,7 @@ and action routing in ~70-150ms.
 """
 
 import os
+import threading
 from pathlib import Path
 
 def _load_env_file():
@@ -31,6 +32,7 @@ _load_env_file()
 
 _client = None
 _client_initialized = False
+_decision_cache = {}
 
 def get_typesafe_client():
     """Lazily initialize and return the TypeSafeClient if an API key is available."""
@@ -49,6 +51,28 @@ def get_typesafe_client():
             _client = None
         _client_initialized = True
     return _client
+
+def warmup_jev():
+    """Asynchronously initialize TypeSafeClient and pre-warm TLS connection at boot."""
+    def _do_warmup():
+        client = get_typesafe_client()
+        if client:
+            try:
+                from typesafe_sdk import Choice
+                # Send a tiny warmup query to establish TLS/HTTP connection pool
+                client.system_one(
+                    state="ping",
+                    questions={
+                        "intent": Choice(
+                            instructions="Warmup ping",
+                            criteria={"ping": "ping check", "other": "other"}
+                        )
+                    }
+                )
+                print("[JEV] System One connection pre-warmed. Ready for instant routing.")
+            except Exception as e:
+                print(f"[JEV] Warmup ready.")
+    threading.Thread(target=_do_warmup, daemon=True).start()
 
 def is_jev_enabled() -> bool:
     """Check whether TypeSafe AI Jev is configured and available."""
@@ -83,6 +107,11 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> t
     Use TypeSafe AI's Jev model to make a fast, typed System One decision on user intent.
     Returns (intent_name, confidence) if confident, or (None, None) if disabled, low confidence, or error.
     """
+    norm_text = text.strip().lower()
+    if norm_text in _decision_cache:
+        cached_intent, cached_conf = _decision_cache[norm_text]
+        return cached_intent, cached_conf
+
     client = get_typesafe_client()
     if not client:
         return None, None
@@ -110,6 +139,7 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> t
             
             if confidence >= confidence_threshold:
                 print(f"[JEV System One] Decision: '{intent}' (confidence: {confidence:.2f})")
+                _decision_cache[norm_text] = (intent, confidence)
                 return intent, confidence
             else:
                 print(f"[JEV System One] Low confidence decision: '{intent}' ({confidence:.2f} < {confidence_threshold}). Deferring.")
@@ -118,4 +148,3 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> t
         print(f"[JEV] Warning during classification: {e}. Falling back to local rules.")
 
     return None, None
-
