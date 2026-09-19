@@ -90,8 +90,19 @@ MODE_COMMAND = (
     "or permanently modifies files. The system will ask for voice confirmation before running these.\n"
     "- Set destructive=false for read-only commands (searching, listing, reading, opening).\n"
     "- If the user wants to open a folder, use: Start-Process explorer 'path'\n"
-    "- If the user wants to open a repo in VS Code, use: code 'path'\n"
     "- Output ONLY the JSON. No explanation, no commentary, no markdown fences."
+)
+
+MODE_INTERACTIVE_TYPE = (
+    "TASK: The user wants to type something into the screen, but their request might be vague or underspecified. "
+    "You have been given a screenshot of their current display and their raw spoken request. "
+    "Evaluate if you have enough context to generate the exact text they want to type. "
+    "Respond ONLY with valid JSON in one of these two formats:\n\n"
+    "IF YOU NEED CLARIFICATION (Option A):\n"
+    '{"action": "ask", "question": "Brief clarifying question to ask the user"}\n\n'
+    "IF YOU HAVE ENOUGH CONTEXT (Option B):\n"
+    '{"action": "type", "text": "The exact refined text to type", "target_element": "Visual description of the input box"}\n\n'
+    "- NEVER output anything other than the JSON object."
 )
 
 
@@ -112,6 +123,8 @@ def build_system_prompt(mode="text"):
         parts.extend(["", MODE_CLICK])
     elif mode == "command":
         parts.extend(["", MODE_COMMAND])
+    elif mode == "interactive_type":
+        parts.extend(["", MODE_INTERACTIVE_TYPE])
     
     base = "\n".join(parts)
     

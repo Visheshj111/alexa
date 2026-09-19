@@ -99,22 +99,23 @@ JEV_INTENT_CRITERIA = {
     "chat_mode": "User wants to switch to typing/chat mode instead of voice",
     "stop_listening": "User wants the assistant to stop listening or pause voice input",
     "shutdown": "User wants to exit, quit, power off, or terminate the assistant",
+    "mode_switch": "User wants to switch version to 2.0 or 1.0, or give control to Jev or local AI",
+    "improve_codebase": "User asks the assistant to improve the codebase, write code, add a feature, or use a tool like AntiGravity/Cursor",
     "text": "General conversational questions, advice, reasoning, coding, or chit-chat"
 }
 
-def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> tuple[str | None, float | None]:
+def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> dict | None:
     """
     Use TypeSafe AI's Jev model to make a fast, typed System One decision on user intent.
-    Returns (intent_name, confidence) if confident, or (None, None) if disabled, low confidence, or error.
+    Returns a dict with 'intent', 'target', 'payload', and 'tool_preference', or None.
     """
     norm_text = text.strip().lower()
     if norm_text in _decision_cache:
-        cached_intent, cached_conf = _decision_cache[norm_text]
-        return cached_intent, cached_conf
+        return _decision_cache[norm_text]
 
     client = get_typesafe_client()
     if not client:
-        return None, None
+        return None
 
     try:
         from typesafe_sdk import Choice, Noul
@@ -126,8 +127,22 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> t
                     instructions="Identify the primary intent or action requested by the user.",
                     criteria=JEV_INTENT_CRITERIA
                 ),
-                "is_urgent": Noul(
-                    instructions="Does this request require immediate urgent or emergency intervention?"
+                "target": Noul(
+                    instructions="If the user specified a target app, window, setting, or file, extract it here. (e.g. 'chrome', 'spotify', 'volume')"
+                ),
+                "payload": Noul(
+                    instructions="If the user specified text to type, a search query, a URL, or specific instructions, extract it here."
+                ),
+                "tool_preference": Choice(
+                    instructions="If the user specified an external tool for coding or delegation, extract it.",
+                    criteria={
+                        "antigravity_terminal": "User explicitly asked to use AntiGravity terminal or 'agy'",
+                        "opencode": "User asked to use OpenCode or 'open code'",
+                        "antigravity_gui": "User asked to use AntiGravity (without specifying terminal) or AntiGravity IDE",
+                        "cursor": "User asked to use Cursor IDE",
+                        "vscode": "User asked to use VS Code",
+                        "none": "No tool was explicitly requested"
+                    }
                 )
             }
         )
@@ -138,13 +153,27 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> t
             confidence = choice_ans.confidence
             
             if confidence >= confidence_threshold:
-                print(f"[JEV System One] Decision: '{intent}' (confidence: {confidence:.2f})")
-                _decision_cache[norm_text] = (intent, confidence)
-                return intent, confidence
+                target = response.nouls.get("target")
+                payload = response.nouls.get("payload")
+                tool_pref = response.choices.get("tool_preference")
+                tool_pref_val = tool_pref.choice if tool_pref and tool_pref.confidence > 0.5 else "none"
+                
+                result = {
+                    "intent": intent,
+                    "target": target,
+                    "payload": payload,
+                    "tool_preference": tool_pref_val,
+                    "confidence": confidence
+                }
+                
+                print(f"[JEV System One] Decision: '{intent}' (target: {target}, payload: {payload}, tool: {tool_pref_val})")
+                _decision_cache[norm_text] = result
+                return result
             else:
                 print(f"[JEV System One] Low confidence decision: '{intent}' ({confidence:.2f} < {confidence_threshold}). Deferring.")
 
     except Exception as e:
         print(f"[JEV] Warning during classification: {e}. Falling back to local rules.")
 
-    return None, None
+    return None
+

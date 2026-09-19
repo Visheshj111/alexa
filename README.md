@@ -116,3 +116,10 @@ voice-agent-offline/
 | **Web Navigation** | *"Open chrome then go to github.com"* | Launches browser and opens target URL. |
 | **Barge-In Interrupt**| *"Stop"* | Immediately cuts speech playback and re-opens listening. |
 | **Vision Inquiry** | *"Look at my screen and summarize this error"* | Inspects screen content and returns brief answer. |
+
+---
+
+## Contributing
+
+We'd love your help making this faster, smarter, and more capable! Check out [contributions.md](contributions.md) for our setup instructions, architectural golden rules, testing shortcuts, and great areas to get involved.
+

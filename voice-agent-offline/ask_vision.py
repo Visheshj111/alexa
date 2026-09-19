@@ -42,7 +42,7 @@ def ask_with_image(question, base64_image, model="local-model", mode="vision", r
                             ]
                         }
                     ],
-                    "temperature": 0.3 if mode == "click" else 0.7,
+                    "temperature": 0.3 if mode in ["click", "interactive_type"] else 0.7,
                     "max_tokens": 1024
                 },
                 timeout=90

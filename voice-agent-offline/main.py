@@ -35,81 +35,119 @@ def clean_command_text(text):
     cleaned = re.sub(r'^(?:on|from)\s+(?:my|the)?\s*screen\s+', '', cleaned, flags=re.IGNORECASE).strip()
     return cleaned if cleaned else text
 
+import json
+ROUTER_MODE = "V1"
+
+def load_settings():
+    global ROUTER_MODE
+    try:
+        with open("settings.json", "r") as f:
+            settings = json.load(f)
+            ROUTER_MODE = settings.get("ROUTER_MODE", "V1")
+    except Exception:
+        ROUTER_MODE = "V1"
+        save_settings()
+
+def save_settings():
+    try:
+        with open("settings.json", "w") as f:
+            json.dump({"ROUTER_MODE": ROUTER_MODE}, f)
+    except Exception:
+        pass
+
+# Initialize settings
+load_settings()
+print(f"Loaded ROUTER_MODE: {ROUTER_MODE}")
+
 def get_intent(text):
     cleaned = clean_command_text(text).lower()
     
+    if ROUTER_MODE == "V2" and is_jev_enabled():
+        jev_dict = classify_intent_with_jev(cleaned)
+        if jev_dict:
+            return jev_dict
+            
     # 1. Deterministic instant fast-paths (<0.1ms) for common commands
     if cleaned in ["shutdown", "exit", "quit", "power off", "shut down"]:
-        return "shutdown"
+        return {"intent": "shutdown", "payload": cleaned, "target": None, "tool_preference": "none"}
     if cleaned in ["stop listening", "stop", "pause listening"]:
-        return "stop_listening"
+        return {"intent": "stop_listening", "payload": cleaned, "target": None, "tool_preference": "none"}
     if cleaned in ["switch to chat", "chat mode", "text mode", "type mode", "typing mode"]:
-        return "chat_mode"
+        return {"intent": "chat_mode", "payload": cleaned, "target": None, "tool_preference": "none"}
         
     if cleaned.startswith("remind me"):
-        return "reminder"
+        return {"intent": "reminder", "payload": cleaned, "target": None, "tool_preference": "none"}
     if any(kw in cleaned for kw in ["what are my reminders", "list my reminders", "read my reminders", "do i have any reminders"]):
-        return "list_reminders"
+        return {"intent": "list_reminders", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     if any(kw in cleaned for kw in ["remember that", "remember this", "don't forget", "change what you remember"]):
-        return "remember"
+        return {"intent": "remember", "payload": cleaned, "target": None, "tool_preference": "none"}
     if any(kw in cleaned for kw in ["forget that", "forget about", "stop remembering"]):
-        return "forget"
+        return {"intent": "forget", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     if "blocklock" in cleaned or any(kw in cleaned for kw in ["block application", "block app", "block site", "block website"]):
-        return "blocklock"
+        return {"intent": "blocklock", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # Web browsing & website navigation
     if (cleaned.startswith("go to ") or cleaned.startswith("navigate to ") or cleaned.startswith("open site ") or cleaned.startswith("open website ")) and any(ext in cleaned for ext in [".com", ".org", ".net", ".io", ".gov", "facebook", "youtube", "google", "github", "twitter", "x.com", "reddit"]):
-        return "web_navigate"
+        return {"intent": "web_navigate", "payload": cleaned, "target": None, "tool_preference": "none"}
     if any(domain in cleaned for domain in ["facebook.com", "youtube.com", "google.com", "github.com", "twitter.com", "x.com", "reddit.com"]):
-        return "web_navigate"
+        return {"intent": "web_navigate", "payload": cleaned, "target": None, "tool_preference": "none"}
 
-    # Type / prompt writing intent (check BEFORE generic app open)
+    # Type / prompt writing intent
     if any(cleaned.startswith(p) for p in ["type ", "write prompt", "write a prompt", "enter text", "put text", "enter prompt"]):
-        return "type"
+        return {"intent": "type", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # Screen Click intent
     if any(cleaned.startswith(p) for p in ["click", "press the", "tap the", "select the"]):
-        return "click"
+        return {"intent": "click", "payload": cleaned, "target": None, "tool_preference": "none"}
         
     # Check open windows
     if any(kw in cleaned for kw in ["open apps", "open windows", "what's open", "running right now", "list windows", "what apps"]):
-        return "windows"
+        return {"intent": "windows", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # Fast app launch & close
     if any(cleaned.startswith(p) for p in ["open ", "launch ", "start "]):
-        return "app_open"
+        return {"intent": "app_open", "payload": cleaned, "target": None, "tool_preference": "none"}
     if any(cleaned.startswith(p) for p in ["close ", "kill ", "quit ", "shut ", "terminate "]) and not any(kw in cleaned for kw in ["shut down", "quit", "exit"]):
-        return "app_close"
+        return {"intent": "app_close", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # File search
     if any(kw in cleaned for kw in ["find a file", "search for a file", "find the file", "read the file", "file called", "file named", "search in"]):
-        return "file_search"
+        return {"intent": "file_search", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # System control
     if any(kw in cleaned for kw in ["brightness", "lock screen", "lock the screen", "lock my pc", "lock my computer", "sleep", "go to sleep", "put the pc to sleep"]):
-        return "system"
+        return {"intent": "system", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # Media control
     if any(kw in cleaned for kw in ["play", "pause", "resume", "skip", "next song", "previous song", "volume", "mute", "unmute", "louder", "quieter", "turn it up", "turn it down"]):
-        return "media"
+        return {"intent": "media", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # Vision requests
     if any(kw in cleaned for kw in ["screen", "looking at", "read this", "see this", "on my display", "what am i looking at"]):
-        return "vision"
+        return {"intent": "vision", "payload": cleaned, "target": None, "tool_preference": "none"}
 
     # Terminal / system commands
     if any(cleaned.startswith(p) for p in ["run a", "run the", "execute", "terminal", "powershell"]) or any(kw in cleaned for kw in ["disk space", "storage space", "free space", "running processes"]):
-        return "terminal"
+        return {"intent": "terminal", "payload": cleaned, "target": None, "tool_preference": "none"}
 
-    # 2. TypeSafe AI Jev System One Model (~70ms for natural/paraphrased/ambiguous intent)
-    if is_jev_enabled():
-        jev_intent, _ = classify_intent_with_jev(cleaned)
-        if jev_intent:
-            return jev_intent
+    # Mode switch & improve (V1 heuristics)
+    if any(kw in cleaned for kw in ["switch to version 2", "control to jev", "version 2.0"]):
+        return {"intent": "mode_switch", "payload": "V2", "target": None, "tool_preference": "none"}
+    if any(kw in cleaned for kw in ["switch to version 1", "control to local", "version 1.0", "revert back"]):
+        return {"intent": "mode_switch", "payload": "V1", "target": None, "tool_preference": "none"}
+    if any(kw in cleaned for kw in ["improve yourself", "add a feature", "improve the codebase", "write code"]):
+        return {"intent": "improve_codebase", "payload": cleaned, "target": None, "tool_preference": "none"}
 
-    return "text"
+    # 2. TypeSafe AI Jev System One Model (~70ms for natural/paraphrased/ambiguous intent) - Fallback for V1
+    if ROUTER_MODE == "V1" and is_jev_enabled():
+        jev_dict = classify_intent_with_jev(cleaned)
+        if jev_dict:
+            return jev_dict
+
+    return {"intent": "text", "payload": cleaned, "target": None, "tool_preference": "none"}
+
 
 def split_commands(text):
     cleaned_input = clean_command_text(text)
@@ -123,7 +161,7 @@ def split_commands(text):
         next_chunk = parts[i+1]
         cleaned_next = re.sub(r'\b(hey|can you|could you|please|alexa|would you|just|go ahead and|i want you to|i need you to)\b', '', next_chunk, flags=re.IGNORECASE).strip()
         cleaned_next = clean_command_text(cleaned_next)
-        if get_intent(cleaned_next) != "text" and cleaned_next != "":
+        if get_intent(cleaned_next)["intent"] != "text" and cleaned_next != "":
             commands.append(current_command.strip())
             current_command = cleaned_next
         else:
@@ -215,26 +253,72 @@ def handle_click_intent(question, record_clip_fn, transcribe_fn, speak_fn):
     speak_fn(f"Clicked {desc.strip()}.")
 
 
-def handle_type_intent(question, speak_fn):
-    cleaned = clean_command_text(question)
+def handle_type_intent(question, payload, speak_fn, record_clip_fn=None, transcribe_fn=None, get_input_fn=None):
+    import json
+    from ask_vision import ask_with_image
+    from screenshot import capture_screen_base64
+    from screen_type import click_and_type, type_text
     
-    needs_refinement = any(kw in cleaned.lower() for kw in ["prompt", "enhance", "write a prompt", "create a prompt", "refine"])
-    press_enter = any(kw in cleaned.lower() for kw in ["enter it", "submit", "press enter", "and enter", "and send"])
+    current_request = payload if payload else question
     
-    text_to_type = cleaned
-    for prefix in ["type ", "write a prompt to ", "write prompt to ", "write a prompt ", "write ", "enter text ", "put text "]:
-        if cleaned.lower().startswith(prefix):
-            text_to_type = cleaned[len(prefix):].strip()
-            break
+    while True:
+        try:
+            image_b64 = capture_screen_base64()
+            response = ask_with_image(current_request, image_b64, mode="interactive_type")
             
-    if needs_refinement:
-        print(f"[TYPE] Refining prompt for: {text_to_type}")
-        speak_fn("Refining prompt...")
-        text_to_type = screen_type.refine_prompt_for_ai(text_to_type)
-        
-    print(f"[TYPE] Pasting text into active window (press_enter={press_enter}): {text_to_type[:60]}...")
-    screen_type.type_text(text_to_type, press_enter=press_enter)
-    speak_fn("Done.")
+            # Clean JSON block
+            json_str = response.strip()
+            if json_str.startswith("```json"):
+                json_str = json_str[7:]
+            elif json_str.startswith("```"):
+                json_str = json_str[3:]
+            if json_str.endswith("```"):
+                json_str = json_str[:-3]
+            json_str = json_str.strip()
+            
+            data = json.loads(json_str)
+        except Exception as e:
+            print(f"[TYPE] JSON Parse Error: {e}\nFalling back to direct typing.")
+            # Fallback to dumb typing
+            type_text(current_request)
+            speak_fn("Done.")
+            return
+
+        action = data.get("action")
+        if action == "ask":
+            q = data.get("question", "Could you clarify?")
+            speak_fn(q)
+            
+            # Get user clarification
+            reply = ""
+            if get_input_fn:
+                reply = get_input_fn("User clarification: ")
+            elif record_clip_fn and transcribe_fn:
+                audio = record_clip_fn(wait_timeout=5.0)
+                if audio is not None:
+                    reply = transcribe_fn(audio)
+            
+            if not reply:
+                speak_fn("Nevermind.")
+                return
+            
+            current_request += f"\nUser clarification: {reply}"
+            
+        elif action == "type":
+            text_to_type = data.get("text", "")
+            target_element = data.get("target_element")
+            if target_element:
+                speak_fn(f"Typing into {target_element}...")
+                success = click_and_type(target_element, text_to_type)
+                if not success:
+                    type_text(text_to_type)
+            else:
+                type_text(text_to_type)
+            speak_fn("Done.")
+            return
+        else:
+            type_text(current_request)
+            return
 
 
 def handle_web_navigate_intent(question, speak_fn):
@@ -429,7 +513,11 @@ def main_loop():
             for cmd_text in commands:
                 cleaned_for_intent = re.sub(filler_pattern, '', cmd_text, flags=re.IGNORECASE).strip()
                 cleaned_for_intent = re.sub(r'\s+', ' ', cleaned_for_intent)
-                intent = get_intent(cleaned_for_intent)
+                intent_data = get_intent(cleaned_for_intent)
+                intent = intent_data["intent"]
+                target = intent_data["target"]
+                payload = intent_data["payload"]
+                tool_pref = intent_data["tool_preference"]
                 
                 if intent == "shutdown":
                     speak_cached(random.choice(SHUTDOWN_PHRASES))
@@ -561,7 +649,7 @@ def main_loop():
                     handle_click_intent(cmd_text, record_clip, transcribe_audio, speak)
 
                 elif intent == "type":
-                    handle_type_intent(cmd_text, speak)
+                    handle_type_intent(cmd_text, payload, speak, record_clip_fn=record_clip, transcribe_fn=transcribe_audio)
 
                 elif intent == "web_navigate":
                     handle_web_navigate_intent(cmd_text, speak)
@@ -666,6 +754,21 @@ def main_loop():
                         
                         needs_consolidation = save_turn(cmd_text, f"[Executed: {command}] {output[:200]}")
 
+                elif intent == "mode_switch":
+                    global ROUTER_MODE
+                    if "2" in str(payload) or "jev" in str(payload).lower() or "online" in str(payload).lower() or "v2" in str(payload).lower():
+                        ROUTER_MODE = "V2"
+                        save_settings()
+                        speak("Switched to Version 2.0. TypeSafe AI Jev now has full structural control.")
+                    else:
+                        ROUTER_MODE = "V1"
+                        save_settings()
+                        speak("Switched to Version 1.0. Local AI heuristics now prioritize routing.")
+                        
+                elif intent == "improve_codebase":
+                    from delegation_engine import handle_delegation
+                    handle_delegation(cmd_text, payload, tool_pref, speak)
+
                 else:
                     speak_cached(random.choice(THINKING_PHRASES))
                     answer, was_interrupted = speak_stream(ask_stream(cmd_text))
@@ -718,7 +821,11 @@ def chat_loop():
         # Clean and detect intent
         cleaned = re.sub(filler_pattern, '', user_input, flags=re.IGNORECASE).strip()
         cleaned = re.sub(r'\s+', ' ', cleaned)
-        intent = get_intent(cleaned)
+        intent_data = get_intent(cleaned)
+        intent = intent_data["intent"]
+        target = intent_data["target"]
+        payload = intent_data["payload"]
+        tool_pref = intent_data["tool_preference"]
         
         # Process the command (text output, no TTS)
         needs_consolidation = False
@@ -806,7 +913,7 @@ def chat_loop():
             handle_click_intent(cleaned, None, None, print)
 
         elif intent == "type":
-            handle_type_intent(cleaned, print)
+            handle_type_intent(cleaned, payload, print, get_input_fn=input)
 
         elif intent == "web_navigate":
             handle_web_navigate_intent(cleaned, print)
@@ -884,6 +991,21 @@ def chat_loop():
             else:
                 for r in rems:
                     print(f"  • {r['text']} (created {r['created']})")
+
+        elif intent == "mode_switch":
+            global ROUTER_MODE
+            if "2" in str(payload) or "jev" in str(payload).lower() or "online" in str(payload).lower() or "v2" in str(payload).lower():
+                ROUTER_MODE = "V2"
+                save_settings()
+                print("Switched to Version 2.0. TypeSafe AI Jev now has full structural control.")
+            else:
+                ROUTER_MODE = "V1"
+                save_settings()
+                print("Switched to Version 1.0. Local AI heuristics now prioritize routing.")
+                
+        elif intent == "improve_codebase":
+            from delegation_engine import handle_delegation
+            handle_delegation(user_input, payload, tool_pref, print)
 
         else:
             # General text query — print response instead of speaking
