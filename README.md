@@ -6,29 +6,29 @@ All processing runs 100% locally on your machine with zero external cloud depend
 
 ---
 
-## 🚀 Capabilities
+##  Capabilities
 
-### 🎙️ 1. Real-Time Voice Engine & Speech Interruption
+###  1. Real-Time Voice Engine & Speech Interruption
 - **Wake Word Recognition:** Continuous low-overhead listener powered by `openwakeword`.
 - **In-Memory STT & Speech Synthesis:** Speech-to-text via `faster-whisper` and text-to-speech via `PiperVoice` running entirely in RAM.
 - **Barge-In / Instant Interrupt:** Saying *"stop"* or speaking while the assistant is responding halts audio playback in **< 100ms** and re-opens active listening immediately.
 
-### 💻 2. OS Control & Terminal Automation
+###  2. OS Control & Terminal Automation
 - **PowerShell Command Generation:** Translates natural language requests (*"find all PDF files"*, *"scan disk space"*, *"delete temporary logs"*) into PowerShell commands.
 - **Safety Confirmation Gate:** Destructive operations (`Remove-Item`, `del`, `format`) trigger mandatory user confirmation before execution.
 - **App & Media Management:** Launch, close, and control applications, volume, and playback.
 
-### 🖱️ 3. Computer Vision & Screen Automation
+###  3. Computer Vision & Screen Automation
 - **Zero-Delay Element Clicking:** Captures display content, computes normalized UI element coordinates via vision models, and clicks target elements instantly without confirmation delays.
 - **Screen Text Input & Prompt Refinement:** Refines rough spoken instructions into structured prompts and inputs them into active windows via fast clipboard hotkeys.
 
-### 🌐 4. Remote Web Interface & Terminal Modes
+###  4. Remote Web Interface & Terminal Modes
 - **Web Interface:** Built-in REST server (`web_server.py`) serving a responsive mobile web interface accessible over local WiFi at `http://<host-ip>:8080`.
 - **Keyboard Terminal Mode:** CLI chat mode for text interaction without microphone input (`--chat` flag).
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ```text
 ┌────────────────────────┐      ┌─────────────────────────┐      ┌────────────────────────┐
@@ -49,7 +49,7 @@ All processing runs 100% locally on your machine with zero external cloud depend
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```text
 voice-agent-offline/
@@ -77,7 +77,7 @@ voice-agent-offline/
 
 ---
 
-## 🛠️ Setup & Requirements
+##  Setup & Requirements
 
 ### Prerequisites
 
@@ -106,7 +106,7 @@ voice-agent-offline/
 
 ---
 
-## 💡 Example Usage
+##  Example Usage
 
 | Category | Example Command | Action |
 | :--- | :--- | :--- |
