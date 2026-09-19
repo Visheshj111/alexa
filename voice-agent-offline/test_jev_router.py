@@ -18,8 +18,11 @@ def test_router():
     ]
     
     for q in test_queries:
-        intent, conf = classify_intent_with_jev(q)
-        print(f"Query: '{q}' -> Jev Intent: {intent} (conf: {conf})")
+        res = classify_intent_with_jev(q)
+        if res:
+            print(f"Query: '{q}' -> Jev Intent: {res.get('intent')} (conf: {res.get('confidence')})")
+        else:
+            print(f"Query: '{q}' -> Jev Intent: None")
 
     print("\nRouter test executed cleanly.")
 

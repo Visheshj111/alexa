@@ -4,18 +4,18 @@ import glob
 # Map spoken folder aliases to absolute paths on disk.
 # The AI will try to match words you say against these keys.
 FOLDER_MAP = {
-    "downloads": "C:/Users/vishe/Downloads",
-    "desktop": "C:/Users/vishe/Desktop",
-    "documents": "C:/Users/vishe/Documents",
-    "pictures": "C:/Users/vishe/Pictures",
-    "videos": "C:/Users/vishe/Videos",
-    "music": "C:/Users/vishe/Music",
-    "onedrive": "C:/Users/vishe/OneDrive",
+    "downloads": f"{home}/Downloads",
+    "desktop": f"{home}/Desktop",
+    "documents": f"{home}/Documents",
+    "pictures": f"{home}/Pictures",
+    "videos": f"{home}/Videos",
+    "music": f"{home}/Music",
+    "onedrive": f"{home}/OneDrive",
     "repos": "C:/Vishesh/Docs/Repos",
     "vishesh": "C:/Vishesh",
     "apps": "C:/Vishesh/Apps",
     "c drive": "C:/",
-    "users": "C:/Users/vishe",
+    "users": home,
 }
 
 # File extensions we know how to read
@@ -34,12 +34,29 @@ def find_file(folder_alias, search_terms, recursive=True):
     if not os.path.isdir(folder_path):
         return None, f"The folder '{folder_path}' doesn't exist on your drive."
 
-    # Build all candidate files
+    # Build all candidate files using a single pass
     found_files = []
-    pattern = "**/*" if recursive else "*"
-    for ext in SUPPORTED_EXTENSIONS:
-        matches = glob.glob(os.path.join(folder_path, pattern + ext), recursive=recursive)
-        found_files.extend(matches)
+    
+    # Pre-compute valid extensions as a set for O(1) lookup
+    valid_exts = set(SUPPORTED_EXTENSIONS)
+    
+    if recursive:
+        for root, dirs, files in os.walk(folder_path):
+            # Skip hidden dirs or huge dirs for speed
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', '__pycache__', 'AppData')]
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in valid_exts:
+                    found_files.append(os.path.join(root, file))
+    else:
+        try:
+            for entry in os.scandir(folder_path):
+                if entry.is_file():
+                    ext = os.path.splitext(entry.name)[1].lower()
+                    if ext in valid_exts:
+                        found_files.append(entry.path)
+        except PermissionError:
+            pass
 
     if not found_files:
         return None, f"No readable files found in {folder_path}."

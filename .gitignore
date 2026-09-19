@@ -15,7 +15,11 @@ venv/
 .phrase_cache/
 
 # Local runtime state and databases
-*.json
+memory.json
+memory_changelog.json
+reminders.json
+conversation_history.json
+settings.json
 *.json.bak
 .verification_state
 .continuous_state

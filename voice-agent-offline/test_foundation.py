@@ -11,7 +11,7 @@ def test_speaker_verify():
     print("Generating enrolled voice using Piper...")
     subprocess.run([
         sys.executable, "-m", "piper",
-        "--model", r"c:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx",
+        "--model", r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx",
         "--output_file", "enrolled_voice.wav"
     ], input="Hello, my name is Vishesh. This is my enrolled voice sample.".encode('utf-8'), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
@@ -19,7 +19,7 @@ def test_speaker_verify():
     print("Generating another voice for the SAME user using Piper...")
     subprocess.run([
         sys.executable, "-m", "piper",
-        "--model", r"c:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx",
+        "--model", r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx",
         "--output_file", "same_user.wav"
     ], input="Remind me to buy groceries tomorrow. Open my email.".encode('utf-8'), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     

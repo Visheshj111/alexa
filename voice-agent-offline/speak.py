@@ -6,9 +6,9 @@ import numpy as np
 import sounddevice as sd
 from piper import PiperVoice
 
-PIPER_MODEL = r"c:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx"
+PIPER_MODEL = r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx"
 if not os.path.exists(PIPER_MODEL):
-    PIPER_MODEL = r"c:\Vishesh\Docs\Repos\alexa\en_US-lessac-high.onnx"
+    PIPER_MODEL = r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-high.onnx"
 
 _voice_instance = None
 

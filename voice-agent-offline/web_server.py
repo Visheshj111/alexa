@@ -102,7 +102,8 @@ def chat():
     filler_pattern = r'\b(hey|can you|could you|please|alexa|would you|just)\b'
     cleaned = re.sub(filler_pattern, '', message, flags=re.IGNORECASE).strip()
     cleaned = re.sub(r'\s+', ' ', cleaned)
-    intent = get_intent(cleaned)
+    intent_data = get_intent(cleaned)
+    intent = intent_data["intent"] if isinstance(intent_data, dict) else intent_data
     
     try:
         if intent == "remember":

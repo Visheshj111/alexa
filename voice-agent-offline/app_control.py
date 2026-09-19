@@ -1,4 +1,7 @@
 import subprocess
+from pathlib import Path
+
+home = str(Path.home())
 
 APP_PATHS = {
     # Browsers
@@ -9,15 +12,15 @@ APP_PATHS = {
     "zen": "C:/Vishesh/Apps/zen.exe",
     
     # Dev Tools & Editors
-    "vscode": "C:/Users/vishe/AppData/Local/Programs/Microsoft VS Code/Code.exe",
-    "code": "C:/Users/vishe/AppData/Local/Programs/Microsoft VS Code/Code.exe",
+    "vscode": f"{home}/AppData/Local/Programs/Microsoft VS Code/Code.exe",
+    "code": f"{home}/AppData/Local/Programs/Microsoft VS Code/Code.exe",
     "notepad": "notepad.exe",
     "command prompt": "cmd.exe",
     "terminal": "cmd.exe",
     "powershell": "powershell.exe",
-    "github desktop": "C:/Users/vishe/AppData/Local/GitHubDesktop/GitHubDesktop.exe",
+    "github desktop": f"{home}/AppData/Local/GitHubDesktop/GitHubDesktop.exe",
     "unity": "C:/Vishesh/Apps/6000.3.19f1/Editor/Unity.exe",
-    "mongodb": "C:/Users/vishe/AppData/Local/MongoDBCompass/MongoDBCompass.exe",
+    "mongodb": f"{home}/AppData/Local/MongoDBCompass/MongoDBCompass.exe",
     
     # Office & Productivity
     "word": "C:/Program Files/Microsoft Office/Root/Office16/WINWORD.EXE",
@@ -27,17 +30,17 @@ APP_PATHS = {
     "outlook": "C:/Program Files/Microsoft Office/Root/Office16/OUTLOOK.EXE",
     "access": "C:/Program Files/Microsoft Office/Root/Office16/MSACCESS.EXE",
     "publisher": "C:/Program Files/Microsoft Office/Root/Office16/MSPUB.EXE",
-    "notion": "C:/Users/vishe/AppData/Local/Programs/Notion/Notion.exe",
+    "notion": f"{home}/AppData/Local/Programs/Notion/Notion.exe",
     
     # Media & Creativity
     "spotify": "spotify:",
-    "youtube music": "C:/Users/vishe/AppData/Local/youtube_music_desktop_app/youtube-music-desktop-app.exe",
+    "youtube music": f"{home}/AppData/Local/youtube_music_desktop_app/youtube-music-desktop-app.exe",
     "vlc": "C:/Program Files/VideoLAN/VLC/vlc.exe",
-    "gimp": "C:/Users/vishe/AppData/Local/Programs/GIMP 3/bin/gimp-3.exe",
+    "gimp": f"{home}/AppData/Local/Programs/GIMP 3/bin/gimp-3.exe",
     "zenbeats": "C:/Program Files/Zenbeats/Zenbeats.exe",
     
     # Gaming & Social
-    "discord": "C:/Users/vishe/AppData/Local/Discord/Update.exe --processStart Discord.exe",
+    "discord": f"{home}/AppData/Local/Discord/Update.exe --processStart Discord.exe",
     "steam": "C:/Vishesh/Games/Steam/Steam.exe",
     
     # Utilities
@@ -46,7 +49,7 @@ APP_PATHS = {
     "afterburner": "C:/Games/MSI Afterburner/MSIAfterburner.exe",
     "nvidia": "C:/Program Files/NVIDIA Corporation/NVIDIA app/CEF/NVIDIA App.exe",
     "revo": "C:/Program Files/VS Revo Group/Revo Uninstaller/RevoUnin.exe",
-    "bittorrent": "C:/Users/vishe/AppData/Roaming/BitTorrent Web/btweb.exe",
+    "bittorrent": f"{home}/AppData/Roaming/BitTorrent Web/btweb.exe",
     
     # System Apps
     "explorer": "explorer.exe",

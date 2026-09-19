@@ -29,6 +29,10 @@ class ProjectIndexer:
         t = threading.Thread(target=self._build_index, daemon=True)
         t.start()
         return t
+        
+    def refresh(self):
+        """Forces a refresh of the background index."""
+        self.start_background_indexing()
 
     def _get_all_files(self):
         """Uses git ls-files if available (fastest), else falls back to os.walk."""
@@ -125,20 +129,31 @@ class ProjectIndexer:
         2. Falls back to sequential text search in broken files.
         3. Falls back to sequential text search across all files.
         """
+        import time
+        # Wait briefly for index to build if not ready
+        for _ in range(20):
+            if self._is_ready:
+                break
+            time.sleep(0.1)
+            
         target_lower = target_name.lower().strip()
+        
+        results = []
         
         # 1. Fast O(1) Ram Lookup
         with self._lock:
             if target_lower in self.index:
-                return self.index[target_lower]
+                results.extend(self.index[target_lower])
                 
-        # 2. Sequential fallback on broken files
+        # 2. Always check broken files sequentially since AST missed them
         with self._lock:
             broken = list(self.broken_files)
             
         broken_results = self._sequential_text_search(target_lower, broken)
-        if broken_results:
-            return broken_results
+        results.extend(broken_results)
+        
+        if results:
+            return results
             
         # 3. Deep Sequential fallback across all files
         with self._lock:

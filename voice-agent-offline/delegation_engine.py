@@ -52,42 +52,68 @@ def handle_delegation(raw_prompt: str, payload: str, tool_pref: str, del_route: 
 
 def _handle_local_edit(raw_prompt: str, speak_fn):
     """Uses the local LLM to rewrite a file for small, simple changes."""
-    # We use the Nerve Center to instantly find the file based on the prompt!
+    import json
+    from ask_local import ask
     from nerve_center import get_indexer
+    
     indexer = get_indexer()
-    
-    # Try to extract a potential function name or target from the prompt heuristically
-    words = raw_prompt.replace('"', ' ').replace("'", ' ').split()
-    possible_targets = [w for w in words if len(w) > 3]
-    
-    found_files = []
-    if indexer:
-        for target in possible_targets:
-            results = indexer.find_target(target)
-            if results:
-                found_files.extend(results)
-                break
-                
-    if found_files:
-        best_match = found_files[0]
-        file_path = best_match['file']
-        line_num = best_match['line']
-        speak_fn(f"I found the target in {os.path.basename(file_path)}. Preparing local edit...")
+    if not indexer:
+        speak_fn("Index not ready.")
+        return
         
-        # Read the file content
-        try:
-            with open(best_match['absolute_path'], 'r', encoding='utf-8') as f:
-                content = f.read()
+    # 1. Ask LLM to extract the specific target symbol (function/class/filename)
+    extract_prompt = f"The user said: '{raw_prompt}'. Extract the core function, class, or file name they want to edit. Respond with ONLY the symbol name, nothing else. E.g., 'router', 'get_intent', etc."
+    target_symbol = ask(extract_prompt).strip().strip("'\"").replace(" ", "_")
+    
+    print(f"[LOCAL EDIT] LLM extracted target symbol: {target_symbol}")
+    
+    results = indexer.find_target(target_symbol)
+    if not results:
+        speak_fn(f"I couldn't find anything matching {target_symbol} in the project.")
+        return
+        
+    # Rank hits by how close they are to the exact name
+    results.sort(key=lambda x: abs(len(x['file'].split('/')[-1]) - len(target_symbol)))
+    best_match = results[0]
+    file_path = best_match['file']
+    abs_path = best_match['absolute_path']
+    line_num = best_match['line']
+    
+    speak_fn(f"Found it in {os.path.basename(file_path)}. Preparing edit...")
+    
+    try:
+        with open(abs_path, 'r', encoding='utf-8') as f:
+            content = f.read()
             
-            prompt = f"You are a local coding agent. The user requested: '{raw_prompt}'.\nThe file {file_path} contains the target around line {line_num}.\n\nHere is the file content:\n```python\n{content}\n```\n\nOutput the exact replacement code block to fulfill the request. Format as JSON: {{\"old\": \"...\", \"new\": \"...\"}}"
-            print(f"[LOCAL EDIT] Querying Qwen3 for diff...")
-            response = ask(prompt)
-            print(f"[LOCAL EDIT] LLM suggests:\n{response}")
-            speak_fn("Local edit strategy generated. Review the console for the diff.")
-        except Exception as e:
-            speak_fn("I found the file but had trouble reading it.")
-    else:
-        speak_fn("I couldn't instantly locate the specific file for this edit. Please provide more context.")
+        edit_prompt = f"You are a local coding agent. User requested: '{raw_prompt}'.\nFile {file_path} contains the target around line {line_num}.\n\nOutput the exact replacement code block. Format as strict JSON:\n{{\"old\": \"exact old text to replace\", \"new\": \"new text\"}}"
+        print(f"[LOCAL EDIT] Querying Qwen3 for diff...")
+        response = ask(edit_prompt)
+        
+        # Clean JSON
+        json_str = response.strip()
+        if json_str.startswith("```json"): json_str = json_str[7:]
+        elif json_str.startswith("```"): json_str = json_str[3:]
+        if json_str.endswith("```"): json_str = json_str[:-3]
+        
+        diff = json.loads(json_str.strip())
+        old_text = diff.get("old", "")
+        new_text = diff.get("new", "")
+        
+        if old_text and old_text in content:
+            new_content = content.replace(old_text, new_text, 1)
+            with open(abs_path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+            speak_fn("I have successfully applied the edit.")
+            
+            # Refresh the index!
+            indexer.refresh()
+        else:
+            speak_fn("I generated an edit, but the old text didn't match the file exactly.")
+            print(f"[LOCAL EDIT] Failed match.\nOld text generated: {old_text}")
+            
+    except Exception as e:
+        print(f"[LOCAL EDIT] Error: {e}")
+        speak_fn("I ran into a problem while trying to edit the file.")
 
 def _spawn_terminal_delegation(raw_prompt: str, cli_tool: str):
     """Spawns a visible terminal window running the requested agentic CLI tool."""

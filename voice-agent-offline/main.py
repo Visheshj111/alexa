@@ -123,11 +123,11 @@ def get_intent(text):
         return {"intent": "file_search", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # System control
-    if any(kw in cleaned for kw in ["brightness", "lock screen", "lock the screen", "lock my pc", "lock my computer", "sleep", "go to sleep", "put the pc to sleep"]):
+    if re.search(r'\b(brightness|lock screen|lock the screen|lock my pc|lock my computer|sleep|go to sleep|put the pc to sleep)\b', cleaned):
         return {"intent": "system", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Media control
-    if any(kw in cleaned for kw in ["play", "pause", "resume", "skip", "next song", "previous song", "volume", "mute", "unmute", "louder", "quieter", "turn it up", "turn it down"]):
+    if re.search(r'\b(play|pause|resume|skip|next song|previous song|volume|mute|unmute|louder|quieter|turn it up|turn it down)\b', cleaned):
         return {"intent": "media", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Vision requests
@@ -670,9 +670,9 @@ def main_loop():
                         result = change_brightness(10)
                     elif any(kw in cmd_text for kw in ["down", "decrease", "lower", "dimmer", "dim"]):
                         result = change_brightness(-10)
-                    elif any(kw in cmd_text for kw in ["lock"]):
+                    elif re.search(r'\block\b', cmd_text):
                         result = lock_screen()
-                    elif any(kw in cmd_text for kw in ["sleep"]):
+                    elif re.search(r'\bsleep\b', cmd_text):
                         result = sleep_system()
                     else:
                         result = "I can change brightness, lock the screen, or put the PC to sleep."
@@ -908,9 +908,9 @@ def chat_loop():
                 print(change_brightness(10))
             elif any(kw in user_input for kw in ["down", "decrease", "lower", "dimmer", "dim"]):
                 print(change_brightness(-10))
-            elif any(kw in user_input for kw in ["lock"]):
+            elif re.search(r'\block\b', user_input):
                 print(lock_screen())
-            elif any(kw in user_input for kw in ["sleep"]):
+            elif re.search(r'\bsleep\b', user_input):
                 print(sleep_system())
             else:
                 print("I can change brightness, lock the screen, or put the PC to sleep.")
