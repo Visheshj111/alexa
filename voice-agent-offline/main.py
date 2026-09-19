@@ -55,9 +55,15 @@ def save_settings():
     except Exception:
         pass
 
+from nerve_center import init_indexer
+
 # Initialize settings
 load_settings()
 print(f"Loaded ROUTER_MODE: {ROUTER_MODE}")
+
+# Initialize Nerve Center Background Indexer
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+init_indexer(REPO_ROOT)
 
 def get_intent(text):
     cleaned = clean_command_text(text).lower()
@@ -69,76 +75,76 @@ def get_intent(text):
             
     # 1. Deterministic instant fast-paths (<0.1ms) for common commands
     if cleaned in ["shutdown", "exit", "quit", "power off", "shut down"]:
-        return {"intent": "shutdown", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "shutdown", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
     if cleaned in ["stop listening", "stop", "pause listening"]:
-        return {"intent": "stop_listening", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "stop_listening", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
     if cleaned in ["switch to chat", "chat mode", "text mode", "type mode", "typing mode"]:
-        return {"intent": "chat_mode", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "chat_mode", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
         
     if cleaned.startswith("remind me"):
-        return {"intent": "reminder", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "reminder", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
     if any(kw in cleaned for kw in ["what are my reminders", "list my reminders", "read my reminders", "do i have any reminders"]):
-        return {"intent": "list_reminders", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "list_reminders", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     if any(kw in cleaned for kw in ["remember that", "remember this", "don't forget", "change what you remember"]):
-        return {"intent": "remember", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "remember", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
     if any(kw in cleaned for kw in ["forget that", "forget about", "stop remembering"]):
-        return {"intent": "forget", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "forget", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     if "blocklock" in cleaned or any(kw in cleaned for kw in ["block application", "block app", "block site", "block website"]):
-        return {"intent": "blocklock", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "blocklock", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Web browsing & website navigation
     if (cleaned.startswith("go to ") or cleaned.startswith("navigate to ") or cleaned.startswith("open site ") or cleaned.startswith("open website ")) and any(ext in cleaned for ext in [".com", ".org", ".net", ".io", ".gov", "facebook", "youtube", "google", "github", "twitter", "x.com", "reddit"]):
-        return {"intent": "web_navigate", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "web_navigate", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
     if any(domain in cleaned for domain in ["facebook.com", "youtube.com", "google.com", "github.com", "twitter.com", "x.com", "reddit.com"]):
-        return {"intent": "web_navigate", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "web_navigate", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Type / prompt writing intent
     if any(cleaned.startswith(p) for p in ["type ", "write prompt", "write a prompt", "enter text", "put text", "enter prompt"]):
-        return {"intent": "type", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "type", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Screen Click intent
     if any(cleaned.startswith(p) for p in ["click", "press the", "tap the", "select the"]):
-        return {"intent": "click", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "click", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
         
     # Check open windows
     if any(kw in cleaned for kw in ["open apps", "open windows", "what's open", "running right now", "list windows", "what apps"]):
-        return {"intent": "windows", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "windows", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Fast app launch & close
     if any(cleaned.startswith(p) for p in ["open ", "launch ", "start "]):
-        return {"intent": "app_open", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "app_open", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
     if any(cleaned.startswith(p) for p in ["close ", "kill ", "quit ", "shut ", "terminate "]) and not any(kw in cleaned for kw in ["shut down", "quit", "exit"]):
-        return {"intent": "app_close", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "app_close", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # File search
     if any(kw in cleaned for kw in ["find a file", "search for a file", "find the file", "read the file", "file called", "file named", "search in"]):
-        return {"intent": "file_search", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "file_search", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # System control
     if any(kw in cleaned for kw in ["brightness", "lock screen", "lock the screen", "lock my pc", "lock my computer", "sleep", "go to sleep", "put the pc to sleep"]):
-        return {"intent": "system", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "system", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Media control
     if any(kw in cleaned for kw in ["play", "pause", "resume", "skip", "next song", "previous song", "volume", "mute", "unmute", "louder", "quieter", "turn it up", "turn it down"]):
-        return {"intent": "media", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "media", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Vision requests
     if any(kw in cleaned for kw in ["screen", "looking at", "read this", "see this", "on my display", "what am i looking at"]):
-        return {"intent": "vision", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "vision", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Terminal / system commands
     if any(cleaned.startswith(p) for p in ["run a", "run the", "execute", "terminal", "powershell"]) or any(kw in cleaned for kw in ["disk space", "storage space", "free space", "running processes"]):
-        return {"intent": "terminal", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "terminal", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # Mode switch & improve (V1 heuristics)
     if any(kw in cleaned for kw in ["switch to version 2", "control to jev", "version 2.0"]):
-        return {"intent": "mode_switch", "payload": "V2", "target": None, "tool_preference": "none"}
+        return {"intent": "mode_switch", "payload": "V2", "target": None, "tool_preference": "none", "delegation_route": "none"}
     if any(kw in cleaned for kw in ["switch to version 1", "control to local", "version 1.0", "revert back"]):
-        return {"intent": "mode_switch", "payload": "V1", "target": None, "tool_preference": "none"}
+        return {"intent": "mode_switch", "payload": "V1", "target": None, "tool_preference": "none", "delegation_route": "none"}
     if any(kw in cleaned for kw in ["improve yourself", "add a feature", "improve the codebase", "write code"]):
-        return {"intent": "improve_codebase", "payload": cleaned, "target": None, "tool_preference": "none"}
+        return {"intent": "improve_codebase", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
     # 2. TypeSafe AI Jev System One Model (~70ms for natural/paraphrased/ambiguous intent) - Fallback for V1
     if ROUTER_MODE == "V1" and is_jev_enabled():
@@ -146,7 +152,7 @@ def get_intent(text):
         if jev_dict:
             return jev_dict
 
-    return {"intent": "text", "payload": cleaned, "target": None, "tool_preference": "none"}
+    return {"intent": "text", "payload": cleaned, "target": None, "tool_preference": "none", "delegation_route": "none"}
 
 
 def split_commands(text):
@@ -767,7 +773,7 @@ def main_loop():
                         
                 elif intent == "improve_codebase":
                     from delegation_engine import handle_delegation
-                    handle_delegation(cmd_text, payload, tool_pref, speak)
+                    handle_delegation(cmd_text, payload, tool_pref, del_route, speak)
 
                 else:
                     speak_cached(random.choice(THINKING_PHRASES))
@@ -1005,7 +1011,7 @@ def chat_loop():
                 
         elif intent == "improve_codebase":
             from delegation_engine import handle_delegation
-            handle_delegation(user_input, payload, tool_pref, print)
+            handle_delegation(user_input, payload, tool_pref, del_route, print)
 
         else:
             # General text query — print response instead of speaking

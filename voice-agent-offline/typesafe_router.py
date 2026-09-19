@@ -143,6 +143,14 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> d
                         "vscode": "User asked to use VS Code",
                         "none": "No tool was explicitly requested"
                     }
+                ),
+                "delegation_route": Choice(
+                    instructions="Evaluate the complexity of the requested coding/improvement task.",
+                    criteria={
+                        "local_ai": "Simple text replacements, changing a word, fixing a typo, or modifying a single specific function.",
+                        "external_agent": "Building a new feature, complex architectural changes, or creating new modules.",
+                        "none": "Not a coding or improvement task."
+                    }
                 )
             }
         )
@@ -157,16 +165,19 @@ def classify_intent_with_jev(text: str, confidence_threshold: float = 0.65) -> d
                 payload = response.nouls.get("payload")
                 tool_pref = response.choices.get("tool_preference")
                 tool_pref_val = tool_pref.choice if tool_pref and tool_pref.confidence > 0.5 else "none"
+                del_route = response.choices.get("delegation_route")
+                del_route_val = del_route.choice if del_route and del_route.confidence > 0.5 else "none"
                 
                 result = {
                     "intent": intent,
                     "target": target,
                     "payload": payload,
                     "tool_preference": tool_pref_val,
+                    "delegation_route": del_route_val,
                     "confidence": confidence
                 }
                 
-                print(f"[JEV System One] Decision: '{intent}' (target: {target}, payload: {payload}, tool: {tool_pref_val})")
+                print(f"[JEV System One] Decision: '{intent}' (target: {target}, payload: {payload}, tool: {tool_pref_val}, route: {del_route_val})")
                 _decision_cache[norm_text] = result
                 return result
             else:
