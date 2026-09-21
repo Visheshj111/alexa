@@ -188,47 +188,53 @@ def record_clip(filename=None, silence_limit=0.4, max_seconds=15, seconds=None, 
     silent_chunks = 0
     has_spoken = False
     
-    with sd.InputStream(samplerate=samplerate, channels=1, dtype='float32', blocksize=chunk_samples) as stream:
-        # Dynamically calculate background noise threshold for 0.25s
-        bg_noise = []
-        for _ in range(5):
-            chunk, _ = stream.read(chunk_samples)
-            bg_noise.append(np.max(np.abs(chunk)))
-        threshold = max(0.005, np.mean(bg_noise) * 2.5)
-        
-        start_time = time.time()
-        
-        while True:
-            chunk, overflowed = stream.read(chunk_samples)
-            recorded_frames.append(chunk)
+    try:
+        with sd.InputStream(samplerate=samplerate, channels=1, dtype='float32', blocksize=chunk_samples) as stream:
+            # Dynamically calculate background noise threshold for 0.25s
+            bg_noise = []
+            for _ in range(5):
+                chunk, _ = stream.read(chunk_samples)
+                bg_noise.append(np.max(np.abs(chunk)))
+            threshold = max(0.005, np.mean(bg_noise) * 2.5)
             
-            volume = np.max(np.abs(chunk))
+            start_time = time.time()
             
-            # If fixed duration requested, bypass silence logic
-            if seconds is not None:
-                if (time.time() - start_time) >= seconds:
+            while True:
+                chunk, overflowed = stream.read(chunk_samples)
+                recorded_frames.append(chunk)
+                
+                volume = np.max(np.abs(chunk))
+                
+                # If fixed duration requested, bypass silence logic
+                if seconds is not None:
+                    if (time.time() - start_time) >= seconds:
+                        break
+                    continue
+    
+                if volume > threshold:
+                    has_spoken = True
+                    silent_chunks = 0
+                elif has_spoken:
+                    silent_chunks += 1
+                    
+                # Timeout if they never start speaking
+                if wait_timeout is not None and not has_spoken:
+                    if (time.time() - start_time) > wait_timeout:
+                        return None
+                    
+                # Stop if user finishes speaking (400ms end-of-speech window)
+                if has_spoken and silent_chunks > (silence_limit / chunk_duration):
                     break
-                continue
-
-            if volume > threshold:
-                has_spoken = True
-                silent_chunks = 0
-            elif has_spoken:
-                silent_chunks += 1
-                
-            # Timeout if they never start speaking
-            if wait_timeout is not None and not has_spoken:
-                if (time.time() - start_time) > wait_timeout:
-                    return None
-                
-            # Stop if user finishes speaking (400ms end-of-speech window)
-            if has_spoken and silent_chunks > (silence_limit / chunk_duration):
-                break
-                
-            # Failsafe stop
-            if (time.time() - start_time) > max_seconds:
-                break
-                
+                    
+                # Failsafe stop
+                if (time.time() - start_time) > max_seconds:
+                    break
+                    
+    except sd.PortAudioError as e:
+        print(f"\n[ERROR] Microphone unavailable: {e}")
+        print("Please check if your microphone is unplugged or if another app is exclusively using it.")
+        return None
+        
     audio_data = np.concatenate(recorded_frames, axis=0)
     if filename:
         sf.write(filename, audio_data, samplerate, subtype='PCM_16')

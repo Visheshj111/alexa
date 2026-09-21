@@ -100,31 +100,36 @@ def _play_with_barge_in(audio_data, sample_rate):
         _wake_model.reset()
         
         # Open a 16000Hz int16 stream specifically for the wake word model
-        with sd.InputStream(samplerate=16000, channels=1,
-                            dtype='int16', blocksize=1280) as mic:
-            
-            # Flush the initial buffer to avoid immediate false positives from echo
-            for _ in range(3):
-                mic.read(1280)
+        try:
+            with sd.InputStream(samplerate=16000, channels=1,
+                                dtype='int16', blocksize=1280) as mic:
                 
-            import time
-            start_time = time.time()
-            
-            # Poll the microphone while the audio is still playing
-            while time.time() - start_time < duration:
-                audio_chunk, _ = mic.read(1280)
-                audio_data = audio_chunk.flatten()
-                prediction = _wake_model.predict(audio_data)
+                # Flush the initial buffer to avoid immediate false positives from echo
+                for _ in range(3):
+                    mic.read(1280)
+                    
+                import time
+                start_time = time.time()
                 
-                if prediction.get("alexa", 0) > 0.5:
-                    # User said "Alexa" — kill playback NOW
-                    sd.stop()
-                    print("[BARGE-IN] Wake word 'Alexa' detected. Stopping playback.")
-                    return True
-        
-        # Playback finished naturally — make sure it's fully done
-        sd.wait()
-        return False
+                # Poll the microphone while the audio is still playing
+                while time.time() - start_time < duration:
+                    chunk, overflowed = mic.read(1280)
+                    audio_int16 = np.frombuffer(chunk, dtype=np.int16)
+                    prediction = _wake_model.predict(audio_int16)
+                    
+                    if prediction.get("alexa", 0) > 0.5:
+                        # User said "Alexa" — kill playback NOW
+                        print("\n[BARGE-IN] Wake word 'Alexa' detected. Stopping playback.")
+                        sd.stop()
+                        return True
+            
+            # Playback finished naturally — make sure it's fully done
+            sd.wait()
+            return False
+        except sd.PortAudioError:
+            # If the mic crashes or is unplugged, just wait for the audio to finish normally
+            sd.wait()
+            return False
         
     except Exception as e:
         # If mic monitoring fails (e.g. no mic), fall back to normal playback
