@@ -6,7 +6,12 @@ import numpy as np
 import sounddevice as sd
 from piper import PiperVoice
 
-PIPER_MODEL = r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PIPER_MODEL = os.path.join(REPO_ROOT, "en_US-lessac-medium.onnx")
+if not os.path.exists(PIPER_MODEL):
+    PIPER_MODEL = os.path.join(REPO_ROOT, "en_US-lessac-high.onnx")
+if not os.path.exists(PIPER_MODEL):
+    PIPER_MODEL = r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-medium.onnx"
 if not os.path.exists(PIPER_MODEL):
     PIPER_MODEL = r"C:\Vishesh\Docs\Repos\alexa\en_US-lessac-high.onnx"
 

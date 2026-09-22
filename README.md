@@ -4,6 +4,8 @@ An offline, low-latency multimodal AI voice and computer control agent for Windo
 
 All processing runs 100% locally on your machine with zero external cloud dependencies or telemetry.
 
+> **TODO for myself before open sourcing:** I need to go through the codebase (especially `persona.py`, `app_control.py`, and `file_search.py`) and remove all my hardcoded personal paths (like `C:/Vishesh/...`) and my specific hardware specs (like "Infinix GT Book"), replacing them with dynamic paths or environment variables.
+
 ---
 
 ##  Capabilities

@@ -8,6 +8,16 @@ All processing stays on the laptop — the phone is just a thin client.
 
 import os
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 import re
 import socket
 import json
@@ -187,7 +197,7 @@ def chat():
             
             if destructive:
                 return jsonify({
-                    "response": f"⚠️ This will {description}.\nCommand: `{command}`\n\nSend 'confirm' to execute or anything else to cancel.",
+                    "response": f"[WARNING] This will {description}.\nCommand: `{command}`\n\nSend 'confirm' to execute or anything else to cancel.",
                     "type": "confirm",
                     "pending_command": command
                 })
@@ -195,7 +205,7 @@ def chat():
             success, output = execute_command(command)
             save_turn(message, f"[Executed: {command}] {output[:200]}")
             return jsonify({
-                "response": f"{'✓' if success else '✗'} {output}",
+                "response": f"{'[OK]' if success else '[FAIL]'} {output}",
                 "type": "terminal",
                 "command": command
             })
@@ -262,7 +272,7 @@ def confirm_command():
     
     success, output = execute_command(command)
     return jsonify({
-        "response": f"{'✓' if success else '✗'} {output}",
+        "response": f"{'[OK]' if success else '[FAIL]'} {output}",
         "type": "terminal",
         "command": command
     })
@@ -285,7 +295,7 @@ if __name__ == "__main__":
     port = 8080
     
     print("=" * 55)
-    print("  ALEXA — Web Chat Server")
+    print("  ALEXA - Web Chat Server")
     print("=" * 55)
     print(f"  Local:   http://localhost:{port}")
     print(f"  Network: http://{local_ip}:{port}")

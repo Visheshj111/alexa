@@ -153,7 +153,7 @@ def consolidate_memory(model="local-model"):
         if changes:
             print(f"[MEMORY] Applied {len(changes)} changes:")
             for c in changes:
-                print(f"  → {c}")
+                print(f"  -> {c}")
         else:
             print("[MEMORY] No changes needed.")
         return True

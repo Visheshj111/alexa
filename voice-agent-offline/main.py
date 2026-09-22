@@ -1,3 +1,16 @@
+import sys
+# Configure Windows standard streams to avoid UnicodeEncodeError / charmap crashes on emojis/unicode
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["OMP_NUM_THREADS"] = "2"
@@ -17,8 +30,6 @@ from typesafe_router import classify_intent_with_jev, is_jev_enabled, warmup_jev
 import sounddevice as sd
 import soundfile as sf
 import re
-import sys
-import os
 import numpy as np
 import time
 import random
@@ -41,7 +52,7 @@ ROUTER_MODE = "V1"
 def load_settings():
     global ROUTER_MODE
     try:
-        with open("settings.json", "r") as f:
+        with open("settings.json", "r", encoding="utf-8") as f:
             settings = json.load(f)
             ROUTER_MODE = settings.get("ROUTER_MODE", "V1")
     except Exception:
@@ -50,7 +61,7 @@ def load_settings():
 
 def save_settings():
     try:
-        with open("settings.json", "w") as f:
+        with open("settings.json", "w", encoding="utf-8") as f:
             json.dump({"ROUTER_MODE": ROUTER_MODE}, f)
     except Exception:
         pass
@@ -182,7 +193,7 @@ def record_clip(filename=None, silence_limit=0.4, max_seconds=15, seconds=None, 
     chunk_duration = 0.05
     chunk_samples = int(samplerate * chunk_duration)
     
-    print("\n🎙️ Listening... (Speak now!)")
+    print("\n[MIC] Listening... (Speak now!)")
     
     recorded_frames = []
     silent_chunks = 0
@@ -386,7 +397,7 @@ def main_loop():
     # Load persistent verification state
     verification_file = ".verification_state"
     if os.path.exists(verification_file):
-        with open(verification_file, "r") as f:
+        with open(verification_file, "r", encoding="utf-8") as f:
             verification_enabled = f.read().strip() == "ENABLED"
     else:
         verification_enabled = False # Default off as requested until activated
@@ -446,14 +457,14 @@ def main_loop():
 
             if is_activate_code:
                 verification_enabled = True
-                with open(verification_file, "w") as f:
+                with open(verification_file, "w", encoding="utf-8") as f:
                     f.write("ENABLED")
                 speak("Speaker verification activated. Code 0000 accepted.")
                 continue
                 
             if is_disable_code:
                 verification_enabled = False
-                with open(verification_file, "w") as f:
+                with open(verification_file, "w", encoding="utf-8") as f:
                     f.write("DISABLED")
                 speak("Speaker verification disabled. Code 0000 accepted.")
                 continue
@@ -505,7 +516,7 @@ def main_loop():
                 elif intent == "chat_mode":
                     speak("Switching to chat mode. Type your messages in the terminal.")
                     print("\n" + "="*50)
-                    print("CHAT MODE — Type your messages below.")
+                    print("CHAT MODE - Type your messages below.")
                     print("Type 'voice' to switch back, 'exit' to quit.")
                     print("="*50)
                     chat_loop()
@@ -916,13 +927,13 @@ def chat_loop():
                 print(f"Description: {description}")
                 
                 if destructive:
-                    confirm = input(f"⚠️  This will {description}. Confirm? (yes/no): ").strip().lower()
+                    confirm = input(f"[WARNING] This will {description}. Confirm? (yes/no): ").strip().lower()
                     if confirm not in ["yes", "y", "yeah", "confirm"]:
                         print("Cancelled.")
                         continue
                 
                 success, output = execute_command(command)
-                print(f"{'✓' if success else '✗'} {output}")
+                print(f"{'[OK]' if success else '[FAIL]'} {output}")
                 needs_consolidation = save_turn(user_input, f"[Executed: {command}] {output[:200]}")
 
         elif intent == "file_search":
@@ -964,7 +975,7 @@ def chat_loop():
                 print("You don't have any reminders.")
             else:
                 for r in rems:
-                    print(f"  • {r['text']} (created {r['created']})")
+                    print(f"  - {r['text']} (created {r['created']})")
 
         elif intent == "mode_switch":
             global ROUTER_MODE
@@ -996,7 +1007,7 @@ if __name__ == "__main__":
     if "--chat" in sys.argv:
         # Start directly in chat mode (no voice, no wake word, no TTS)
         print("\n" + "="*50)
-        print("ALEXA — Chat Mode")
+        print("ALEXA - Chat Mode")
         print("Type your messages below.")
         print("Type 'voice' to switch to voice, 'exit' to quit.")
         print("="*50)

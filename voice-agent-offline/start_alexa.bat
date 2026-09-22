@@ -1,5 +1,8 @@
 @echo off
-cd /d "c:\Vishesh\Docs\Repos\alexa\voice-agent-offline"
+chcp 65001 >nul
+set PYTHONIOENCODING=utf-8
+set PYTHONUTF8=1
+cd /d "%~dp0"
 
 if "%1"=="--chat" (
     echo Starting Assistant in Chat Mode...
